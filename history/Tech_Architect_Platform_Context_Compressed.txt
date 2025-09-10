@@ -1,0 +1,126 @@
+
+TECHNICAL ARCHITECT PLATFORM — COMPRESSED CONTEXT (v1)
+
+Purpose (one‑liner)
+Build an Azure‑first “Architecture Advisor” web app that collects NFRs, proposes a secure reference architecture, shows a live diagram, and estimates cost — designed for teaching + practical planning. Future: pluggable providers for AWS/GCP.
+
+Current Scope (lock this for v1)
+- Cloud: Azure default only. Multi‑cloud is a future provider extension (do not expand in v1).
+- Frontend: React + Vite + TypeScript + Tailwind. Diagramming with visx (React‑friendly). Mock data to start.
+- Backend: ASP.NET Core Minimal APIs (.NET 8/9), OpenAPI/Swagger, MongoDB.
+- Runtime: Docker Compose with 3 core containers (frontend, backend, mongodb). Optional local Prometheus + Grafana.
+- Security: Stubbed JWT + roles (Architect, Developer, Admin) with route‑based authorization.
+- Reliability/Operability: /api/v1 route versioning; rate limiting; health checks; provider model for metrics/telemetry.
+- Deliverables: Working NFR wizard → recommendation → diagram → pricing estimate. Export basic report.
+
+Guardrails (to prevent scope creep)
+- v1 only models Azure service catalog and recommendation rules.
+- AWS/GCP appear only as TODO provider stubs + schemas; no parity requirement in v1.
+- Pricing uses mock data tables; replaceable later with real APIs.
+- Diagrams: 1–2 structured layouts; no force-directed layout in v1.
+
+High‑Level Modules
+1) Cloud Architecture (initial)
+   - NFR Wizard (Workload/Traffic, Data/Consistency, Availability/Resilience, Security/Compliance, Ops/Observability, Cost/Constraints)
+   - Recommendation Engine (maps NFRs → Azure services + rationale + security baseline)
+   - Pricing Calculator (component toggles; premium vs standard)
+   - Architecture Diagram (visx; swap nodes e.g., App Service ↔ Container Apps)
+   - Study Guide panels (explanations next to each recommendation)
+2) (Future) API Dev, Frontend Dev, System Integration, AI Agents — stubbed routes/nav only.
+
+Primary Data Shapes (TypeScript‑style)
+type NFRAssessment = {
+  workload: { rps: number; pattern: 'steady' | 'bursty'; latencyMs: { p95: number; p99: number }; regions: string[] };
+  data: { model: 'relational' | 'document' | 'kv' | 'timeseries'; consistency: 'strong' | 'bounded' | 'session' | 'eventual'; readWriteRatio: number; growth: string };
+  availability: { slaPct: number; rtoMin: number; rpoMin: number; multiRegion: boolean };
+  security: { compliance: string[]; dataClasses: string[]; networkPosture: 'private' | 'hybrid' | 'public' };
+  ops: { iac: 'bicep' | 'terraform' | 'arm'; release: 'bluegreen' | 'canary' | 'rolling'; observability: 'azure' | 'local' | 'thirdparty' };
+  cost: { priority: 'performance' | 'cost' | 'balanced'; monthlyBudgetUsd?: number; preferences: string[] };
+};
+
+type AzureServiceRef = { id: string; name: string; category: 'compute' | 'storage' | 'network' | 'security' | 'data' | 'edge'; tier?: 'consumption' | 'standard' | 'premium' };
+
+type ArchitectureRecommendation = {
+  services: AzureServiceRef[];
+  rationale: string[]; // bullets mapping NFR → choice
+  securityGuidelines: string[]; // WAF, Private Endpoints, MI, CMK/HSM, TLS
+  costEstimate: { monthlyUsd: number; breakdown: { serviceId: string; monthlyUsd: number }[] };
+  alternatives: { replaceServiceId: string; options: AzureServiceRef[]; notes?: string }[];
+};
+
+type DiagramNode = { id: string; serviceId: string; role: string; x: number; y: number; connections: string[] };
+type DiagramModel = { nodes: DiagramNode[]; edges: { from: string; to: string; label?: string }[]; layout: 'tiered' | 'three-zone' };
+
+Minimal API Endpoints (/api/v1/*)
+- POST  nfr/assessment           → save + return NFRAssessment (id)
+- GET   nfr/assessment/{id}      → get NFRAssessment
+- GET   nfr/questions            → structured NFR questionnaire
+- POST  architecture/recommend   → ArchitectureRecommendation from NFRAssessment
+- POST  architecture/pricing     → recompute pricing from a recommendation
+- GET   architecture/services    → Azure services catalog (mocked)
+- POST  diagram/generate         → DiagramModel from recommendation
+- POST  diagram/swap-service     → updated DiagramModel after swap
+- GET   health                   → { status: Healthy|Degraded|Unhealthy }
+- GET   health/detailed          → detailed checks (db, ext deps)
+- GET   metrics (optional)       → Prometheus scrape if local provider enabled
+Auth: Use [Authorize] + policy names ('Architect','Developer','Admin') on sensitive endpoints.
+
+Cross‑cutting (pre‑wired, stubbed for v1)
+- Versioning: URL segments (/api/v1) + OpenAPI doc per version.
+- Rate Limiting: Fixed/Token Bucket policies (e.g., “ArchitecturePolicy” 10 req/min).
+- Observability Provider:
+  interface IMonitoringProvider { recordMetric, recordCounter, time, exception }
+  Implementations: PrometheusProvider (local), AzureMonitorProvider (prod). Config‑switch via appsettings.*
+- Health Provider:
+  IHealthCheckProvider with DB/External/System checks; Local vs Azure variants.
+- Security:
+  JWT validation relaxed in dev; role claims enforced at endpoints. Managed Identity & CMK called out in guidance text.
+
+Container Topology (docker‑compose)
+- frontend : node build + static serve (nginx) on 5173 (dev)/80 (prod build)
+- backend  : aspnet minimal api on 8080; exposes /swagger, /health
+- mongodb  : mongo:7 with a named volume
+- (optional) prometheus:9090 & grafana:3000 (local only)
+Env toggles: ASPNETCORE_ENVIRONMENT=Development|Container|Production; MonitoringProvider=Prometheus|AzureMonitor.
+
+Azure‑First Recommendation Rules (seed set)
+- Edge: Azure Front Door Std/Premium + WAF for global routing + TLS.
+- Compute (choose one): Azure App Service | Azure Container Apps | AKS (only if K8s primitives needed). Keep stateless; sessions in Redis.
+- Async: Service Bus (or Storage Queues) for retries/backpressure; Event Hubs if streaming.
+- Data: Azure SQL (relational/ACID) or Cosmos DB (global doc/kv, Session consistency by default). Blob for objects; optional Cognitive Search.
+- Observability: App Insights + Azure Monitor (prod) or Prometheus+Grafana (local).
+- Resilience: Zone‑redundant where available; active‑active across paired regions when RTO/RPO require. Regular failover + chaos tests.
+- Security Baseline: Private Endpoints; Managed Identity; Key Vault (CMK/HSM); TLS 1.2+; zero‑trust egress controls; signed images + private ACR.
+
+Pricing (mock strategy)
+- Table‑driven estimates per tier/region (YAML/JSON). Allow toggles (e.g., disable premium Front Door) and recalc total + breakdown.
+- Budget helpers: “optimize for cost” suggests standard tiers, reduces ingestion/retention, adds cache TTLs.
+
+Frontend Slices
+- Wizard: NFRForm (multi‑step, React Hook Form + Zod)
+- Reco View: ArchitectureDisplay (services, rationale, security calls‑outs)
+- Diagram: ArchitectureDiagram (visx) + DiagramControls (swap node)
+- Pricing: PricingCalculator (sliders + toggles + breakdown)
+- Study: Side panel with concise “why this” explanations and links
+
+Out of Scope for v1 (explicit)
+- Full AWS/GCP catalogs + pricing parity
+- Real cloud pricing APIs
+- Force‑directed, auto‑routed diagrams
+- Production‑grade auth (real IdP/OIDC) — keep stubs
+
+Multi‑Cloud Plan (de‑risked, future)
+- Add CloudProvider enum: 'Azure' | 'AWS' | 'GCP' at Project level; default = 'Azure'.
+- Service Catalog schema is provider‑agnostic; add awsServices.ts, gcpServices.ts later.
+- NFR → rules mapped per provider in separate modules; UI toggles show as disabled (coming soon) to avoid scope creep.
+
+How to Use This Context
+- Paste into LLM as “system/context”. Ask for tasks only within “Current Scope (v1)” and “Guardrails”.
+- When multi‑cloud appears, respond: “Not in v1; recorded as TODO in Multi‑Cloud Plan.”
+
+Explicit TODOs (for next iterations)
+- Hook OpenAPI → generated TS client in frontend build pipeline.
+- Implement Prometheus/Grafana compose services and basic dashboard.
+- Add export (PDF/SVG) for architecture diagram + cost summary.
+- Seed realistic mock pricing tables for 2–3 Azure SKUs per category.
+- Write 3 end‑to‑end sample scenarios (small API, global API, analytics).
