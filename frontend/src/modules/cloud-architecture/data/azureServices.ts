@@ -28,7 +28,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['serverless', 'containers', 'microservices', 'autoscale'],
-        documentation: 'https://docs.microsoft.com/azure/container-apps/'
+        documentation: 'https://docs.microsoft.com/azure/container-apps/',
+        availability: { public: true, gov: true }
       },
       {
         id: 'azure-kubernetes-service',
@@ -49,7 +50,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['kubernetes', 'containers', 'orchestration', 'enterprise'],
-        documentation: 'https://docs.microsoft.com/azure/aks/'
+        documentation: 'https://docs.microsoft.com/azure/aks/',
+        availability: { public: true, gov: true }
       },
       {
         id: 'app-service',
@@ -70,7 +72,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['web-apps', 'apis', 'traditional', 'managed'],
-        documentation: 'https://docs.microsoft.com/azure/app-service/'
+        documentation: 'https://docs.microsoft.com/azure/app-service/',
+        availability: { public: true, gov: true }
       }
     ]
   },
@@ -100,7 +103,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['relational', 'sql', 'hyperscale', 'ha'],
-        documentation: 'https://docs.microsoft.com/azure/sql-database/sql-database-hyperscale'
+        documentation: 'https://docs.microsoft.com/azure/sql-database/sql-database-hyperscale',
+        availability: { public: true, gov: true }
       },
       {
         id: 'cosmos-db',
@@ -121,7 +125,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['nosql', 'global', 'multi-model', 'consistency'],
-        documentation: 'https://docs.microsoft.com/azure/cosmos-db/'
+        documentation: 'https://docs.microsoft.com/azure/cosmos-db/',
+        availability: { public: true, gov: true }
       },
     ]
   },
@@ -151,7 +156,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['object-storage', 'files', 'backup', 'archive'],
-        documentation: 'https://docs.microsoft.com/azure/storage/blobs/'
+        documentation: 'https://docs.microsoft.com/azure/storage/blobs/',
+        availability: { public: true, gov: true }
       }
     ]
   },
@@ -181,7 +187,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['secrets', 'keys', 'certificates', 'hsm'],
-        documentation: 'https://docs.microsoft.com/azure/key-vault/'
+        documentation: 'https://docs.microsoft.com/azure/key-vault/',
+        availability: { public: true, gov: true }
       },
       {
         id: 'front-door',
@@ -202,7 +209,9 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['cdn', 'waf', 'global', 'ssl'],
-        documentation: 'https://docs.microsoft.com/azure/frontdoor/'
+        documentation: 'https://docs.microsoft.com/azure/frontdoor/',
+        availability: { public: true, gov: false },
+        alternatives: { gov: 'app-gateway' }
       },
       {
         id: 'private-endpoints',
@@ -223,7 +232,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['private-link', 'networking', 'security', 'vnet'],
-        documentation: 'https://docs.microsoft.com/azure/private-link/'
+        documentation: 'https://docs.microsoft.com/azure/private-link/',
+        availability: { public: true, gov: true }
       },
       {
         id: 'managed-identity',
@@ -244,7 +254,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['identity', 'authentication', 'azure-ad', 'free'],
-        documentation: 'https://docs.microsoft.com/azure/active-directory/managed-identities-azure-resources/'
+        documentation: 'https://docs.microsoft.com/azure/active-directory/managed-identities-azure-resources/',
+        availability: { public: true, gov: true }
       }
     ]
   },
@@ -274,7 +285,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['apm', 'tracing', 'monitoring', 'telemetry'],
-        documentation: 'https://docs.microsoft.com/azure/application-insights/'
+        documentation: 'https://docs.microsoft.com/azure/application-insights/',
+        availability: { public: true, gov: true }
       },
       {
         id: 'log-analytics',
@@ -295,7 +307,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['logging', 'analytics', 'kql', 'alerting'],
-        documentation: 'https://docs.microsoft.com/azure/log-analytics/'
+        documentation: 'https://docs.microsoft.com/azure/log-analytics/',
+        availability: { public: true, gov: true }
       }
     ]
   },
@@ -325,7 +338,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['networking', 'private', 'subnets', 'routing'],
-        documentation: 'https://docs.microsoft.com/azure/virtual-network/'
+        documentation: 'https://docs.microsoft.com/azure/virtual-network/',
+        availability: { public: true, gov: true }
       },
       {
         id: 'load-balancer',
@@ -397,7 +411,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['messaging', 'queues', 'topics', 'enterprise'],
-        documentation: 'https://docs.microsoft.com/azure/service-bus/'
+        documentation: 'https://docs.microsoft.com/azure/service-bus/',
+        availability: { public: true, gov: true }
       },
       {
         id: 'azure-cache-redis',
@@ -418,7 +433,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['cache', 'redis', 'in-memory', 'sessions'],
-        documentation: 'https://docs.microsoft.com/azure/azure-cache-for-redis/'
+        documentation: 'https://docs.microsoft.com/azure/azure-cache-for-redis/',
+        availability: { public: true, gov: true }
       }
     ]
   },
@@ -448,7 +464,8 @@ export const azureServiceCatalog: AzureServiceCatalog = {
           calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
         },
         tags: ['identity', 'oauth', 'saml', 'conditional-access'],
-        documentation: 'https://docs.microsoft.com/azure/active-directory/'
+        documentation: 'https://docs.microsoft.com/azure/active-directory/',
+        availability: { public: true, gov: true }
       }
     ]
   }

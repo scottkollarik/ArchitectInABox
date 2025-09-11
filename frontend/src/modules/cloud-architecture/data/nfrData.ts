@@ -33,7 +33,7 @@ export const nfrSections: NFRSection[] = [
       {
         id: 'peak-vs-average',
         text: 'What are peak vs average RPS?',
-        inputType: 'compound',
+        inputType: 'latency-targets',
         isRequired: true,
         isOptional: false,
         isCompleted: false,
@@ -58,12 +58,12 @@ export const nfrSections: NFRSection[] = [
       {
         id: 'latency-targets',
         text: 'Latency targets for user experience?',
-        inputType: 'compound',
+        inputType: 'latency-targets',
         isRequired: true,
         isOptional: false,
         isCompleted: false,
         architectureImpact: 'critical',
-        helpText: 'Performance percentiles - P95 should be lower than P99',
+        helpText: 'Performance percentiles — P95 should be lower than P99',
         compoundFields: [
           {
             id: 'p95-value',
@@ -91,16 +91,7 @@ export const nfrSections: NFRSection[] = [
           }
         ]
       },
-      {
-        id: 'region-selection',
-        text: 'Select primary Azure region and DR strategy',
-        inputType: 'azure-region',
-        isRequired: true,
-        isOptional: false,
-        isCompleted: false,
-        architectureImpact: 'critical',
-        helpText: 'Paired region suggestion follows Azure paired region guidance'
-      },
+      // Region selection moved to Project Settings (Cloud > Regions & DR)
       {
         id: 'data-residency',
         text: 'Any data residency needs?',
@@ -108,7 +99,7 @@ export const nfrSections: NFRSection[] = [
         isRequired: false,
         isOptional: true,
         isCompleted: false,
-        dependsOn: ['geo-distribution'],
+        // dependsOn removed: residency is governed by Project Settings policies
         architectureImpact: 'important',
         placeholder: 'e.g., EU data must stay in EU',
         helpText: 'Legal or compliance requirements for data location'
@@ -334,16 +325,12 @@ export const nfrSections: NFRSection[] = [
       {
         id: 'read-write-ratio',
         text: 'Read/write ratio?',
-        inputType: 'compound',
+        inputType: 'percentage-split',
         isRequired: true,
         isOptional: false,
         isCompleted: false,
         architectureImpact: 'important',
-        helpText: 'Percentages should total 100%',
-        compoundFields: [
-          { id: 'read-percent', label: 'Reads %', type: 'text', placeholder: '80' },
-          { id: 'write-percent', label: 'Writes %', type: 'text', placeholder: '20' }
-        ]
+        helpText: 'Percentages should total 100%'
       },
       {
         id: 'item-size',
@@ -381,17 +368,7 @@ export const nfrSections: NFRSection[] = [
           }
         ]
       },
-      {
-        id: 'data-growth',
-        text: 'Expected data growth and retention policies?',
-        inputType: 'text',
-        isRequired: true,
-        isOptional: false,
-        isCompleted: false,
-        architectureImpact: 'important',
-        placeholder: 'e.g., 100GB/month growth, 7 years retention',
-        helpText: 'Determines storage scaling and archival strategy'
-      },
+      
       {
         id: 'transactions',
         text: 'Transactions required across entities? (ACID scope)',

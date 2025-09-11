@@ -1,113 +1,120 @@
-import React from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import NFRAssessmentForm from '../components/NFRAssessmentForm'
 import AzureServicesBrowser from '../components/AzureServicesBrowser'
 import ArchitectureCanvas from '../components/ArchitectureCanvas'
+import { useProject } from '../../../context/ProjectContext'
+import { getSectionCompletion, nfrSections } from '../data/nfrData'
+import type { NFRSection } from '../types'
 
 const CloudArchitecturePage: React.FC = () => {
+  const [showNfr, setShowNfr] = useState(true)
+  const location = useLocation()
+  const { currentProject } = useProject()
+
+  const sections: NFRSection[] = useMemo(() => {
+    return (currentProject?.nfrAssessment as NFRSection[] | undefined) || nfrSections
+  }, [currentProject])
+
+  const summary = useMemo(() => {
+    return sections.map(s => {
+      const c = getSectionCompletion(s)
+      const pct = Math.round((c.required.completed / (c.required.total || 1)) * 100)
+      return { id: s.id, title: s.title, pct, complete: c.isComplete }
+    })
+  }, [sections])
+
+  const openSection = (sectionId: string) => {
+    setShowNfr(true)
+    // Notify NFR form to expand specific section
+    try {
+      window.dispatchEvent(new CustomEvent('nfr-open-section', { detail: { sectionId } }))
+      const el = document.getElementById(`nfr-${sectionId}`)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } catch {}
+  }
+
+  // No text animation; keep UI stable
+
+  // (Reverted) Removed complex flight animation to stabilize rendering
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="bg-white rounded-lg shadow-sm p-6 border border-architect-gray-200">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-architect-gray-900">Cloud Architecture Planner</h1>
-            <p className="text-architect-gray-600 mt-2">
-              Assess your non-functional requirements, explore Azure services, and build your cloud architecture
-            </p>
+    <div className="grid grid-cols-12 gap-6">
+      {/* Full-width info strip spanning 12 columns */}
+      <div className="col-span-12">
+        {/* Unified bordered container so the border continues from tab around strip and down to content */}
+        <div className="border border-azure-blue-300 rounded-lg rounded-tl-none shadow-sm overflow-hidden">
+          {/* Strip header */}
+          <div className="bg-azure-blue-50 px-4 py-2">
+            <div className="flex items-center gap-3 min-w-0">
+            <div
+              className="text-base md:text-lg font-semibold text-azure-blue-900"
+              id="ca-strip-title"
+              style={{ opacity: 1 }}
+            >
+              Cloud Architecture
+            </div>
+            <div className="hidden md:flex flex-wrap gap-1">
+              {summary.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => openSection(s.id)}
+                  className={`text-[11px] px-2 py-0.5 rounded-full border transition ${
+                    s.complete ? 'border-green-300 bg-green-50 text-green-700' : s.pct > 0 ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-architect-gray-300 bg-white text-architect-gray-700'
+                  }`}
+                  title={`NFR: ${s.title}`}
+                >
+                  NFR: {s.title.split('&')[0].trim()} {s.pct}%
+                </button>
+              ))}
+            </div>
+            <div className="ml-auto">
+              <button onClick={() => setShowNfr(!showNfr)} className="text-xs px-2 py-1 rounded border border-azure-blue-300 text-azure-blue-700 hover:bg-white">
+                {showNfr ? 'Hide Requirements' : 'Show Requirements'}
+              </button>
+            </div>
           </div>
-          <div className="text-right text-sm text-architect-gray-500">
-            <p>Based on Azure Well-Architected Framework</p>
-            <p>NFR Assessment → Service Selection → Architecture Design</p>
+          {/* Close strip header container */}
           </div>
+          {/* NFR content inside the same bordered container */}
+          {showNfr && (
+            <div className="bg-white">
+              <div className="pt-4 pb-5 px-5">
+                <NFRAssessmentForm />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-12 gap-6 min-h-screen">
-        {/* Left Column: NFR Assessment */}
-        <div className="col-span-4 space-y-4">
-          <div className="bg-white rounded-lg shadow-lg border border-architect-gray-200 sticky top-6">
-            <div className="bg-gradient-to-r from-azure-blue-50 to-azure-blue-100 px-6 py-4 rounded-t-lg border-b border-architect-gray-200">
-              <h2 className="text-xl font-semibold text-azure-blue-900">Requirements Assessment</h2>
-              <p className="text-azure-blue-700 text-sm mt-1">
-                Define your non-functional requirements
-              </p>
-            </div>
-            <div className="p-6 max-h-[calc(100vh-200px)] overflow-y-auto">
-              <NFRAssessmentForm />
-            </div>
-          </div>
-        </div>
-        
-        {/* Center Column: Azure Services Browser */}
-        <div className="col-span-5 space-y-4">
+      {/* Two-column layout below the strip */}
+        {/* Left: Services */}
+        <div className="col-span-7 space-y-4">
           <div className="bg-white rounded-lg shadow-lg border border-architect-gray-200">
-            <div className="bg-gradient-to-r from-green-50 to-green-100 px-6 py-4 rounded-t-lg border-b border-architect-gray-200">
-              <h2 className="text-xl font-semibold text-green-900">Azure Services Catalog</h2>
-              <p className="text-green-700 text-sm mt-1">
-                Browse and select services for your architecture
-              </p>
+            <div className="px-4 py-3 border-b border-architect-gray-200 flex items-center justify-between">
+              <h2 className="text-sm font-semibold tracking-wide text-architect-gray-900">Azure Services</h2>
+              <span className="text-[11px] text-architect-gray-500">Browse & drag to build</span>
             </div>
-            <div className="p-6 max-h-[calc(100vh-200px)] overflow-y-auto">
+            <div className="p-4">
               <AzureServicesBrowser />
             </div>
           </div>
         </div>
         
-        {/* Right Column: Architecture Canvas */}
-        <div className="col-span-3 space-y-4">
-          <div className="bg-white rounded-lg shadow-lg border border-architect-gray-200 sticky top-6">
-            <div className="bg-gradient-to-r from-purple-50 to-purple-100 px-6 py-4 rounded-t-lg border-b border-architect-gray-200">
-              <h2 className="text-xl font-semibold text-purple-900">Your Architecture</h2>
-              <p className="text-purple-700 text-sm mt-1">
-                Drop services here to build
-              </p>
-            </div>
-            <div className="p-6 max-h-[calc(100vh-200px)] overflow-y-auto">
-              <ArchitectureCanvas />
-            </div>
-          </div>
-          
-          {/* Quick Stats Panel */}
-          <div className="bg-white rounded-lg shadow-sm border border-architect-gray-200 p-4">
-            <h3 className="font-semibold text-architect-gray-900 mb-3">Quick Stats</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-architect-gray-600">Services Selected:</span>
-                <span className="font-medium" id="services-count">0</span>
+        {/* Right: Your Architecture (sticky, scrollable) */}
+        <div className="col-span-5">
+          <div className="sticky top-2">
+            <div className="bg-white rounded-lg shadow-lg border border-architect-gray-200">
+              <div className="px-4 py-3 border-b border-architect-gray-200 flex items-center justify-between">
+                <h2 className="text-sm font-semibold tracking-wide text-architect-gray-900">Your Architecture</h2>
+                <span className="text-[11px] text-architect-gray-500">Drop anywhere in this panel</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-architect-gray-600">Est. Monthly Cost:</span>
-                <span className="font-medium text-green-600" id="estimated-cost">$0</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-architect-gray-600">Compliance Score:</span>
-                <span className="font-medium" id="compliance-score">-</span>
+              <div className="p-4 overflow-y-auto max-h-[calc(100vh-220px)]">
+                <ArchitectureCanvas />
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Help Panel */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-semibold text-blue-900 mb-2">How to Use This Tool</h3>
-        <div className="grid md:grid-cols-3 gap-4 text-sm text-blue-800">
-          <div>
-            <strong>1. Assess Requirements</strong>
-            <p>Fill out the NFR assessment form on the left. Sections will show completion status.</p>
-          </div>
-          <div>
-            <strong>2. Browse Services</strong>
-            <p>Explore Azure services in the center. Expand categories to see available options.</p>
-          </div>
-          <div>
-            <strong>3. Build Architecture</strong>
-            <p>Drag services to the canvas. Dependencies will be automatically included.</p>
-          </div>
-        </div>
-      </div>
-    </div>
   )
 }
 

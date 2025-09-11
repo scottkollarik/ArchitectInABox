@@ -11,6 +11,8 @@ import { nfrSections, getSectionCompletion, getOverallCompletion } from '../data
 import type { NFRSection, NFRQuestion } from '../types'
 import { useProject } from '../../../context/ProjectContext'
 import NumericWithUnits from './inputs/NumericWithUnits'
+import PercentageSplit from './inputs/PercentageSplit'
+import LatencyTargets from './inputs/LatencyTargets'
 import ConditionalFieldSet from './inputs/ConditionalFieldSet'
 import AzureRegionSelector from './inputs/AzureRegionSelector'
 
@@ -18,13 +20,26 @@ const NFRAssessmentForm: React.FC = () => {
   const { currentProject, updateProject } = useProject()
   const [sections, setSections] = useState<NFRSection[]>(nfrSections)
 
-  // Load NFR data from current project
+  // Merge saved NFR with current schema so new input types render while preserving values
   useEffect(() => {
-    if (currentProject?.nfrAssessment) {
-      setSections(currentProject.nfrAssessment)
-    } else {
-      setSections(nfrSections)
+    const merge = (saved: NFRSection[] | undefined, defs: NFRSection[]): NFRSection[] => {
+      if (!saved || saved.length === 0) return defs
+      const byId = new Map(saved.map(s => [s.id, s]))
+      return defs.map(def => {
+        const s = byId.get(def.id)
+        if (!s) return def
+        const qById = new Map((s.questions || []).map(q => [q.id, q]))
+        const mergedQs = def.questions.map(dq => {
+          const sq = qById.get(dq.id) as any
+          // Only reuse saved value if input types match to avoid shape crashes
+          const useValue = sq && sq.inputType === dq.inputType ? sq.value : dq.value
+          const isCompleted = typeof sq?.isCompleted === 'boolean' ? sq.isCompleted : dq.isCompleted
+          return { ...dq, value: useValue, isCompleted }
+        })
+        return { ...def, isCollapsed: s.isCollapsed ?? def.isCollapsed, questions: mergedQs }
+      })
     }
+    setSections(merge(currentProject?.nfrAssessment as NFRSection[] | undefined, nfrSections))
   }, [currentProject])
 
   // Save NFR data to project when sections change (debounced to prevent rapid saves)
@@ -39,6 +54,21 @@ const NFRAssessmentForm: React.FC = () => {
     
     return () => clearTimeout(timer)
   }, [sections]) // Remove currentProject and updateProject from dependencies to break loop
+
+  // Allow external request to open a specific section from summary chips
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { sectionId?: string } | undefined
+      if (!detail?.sectionId) return
+      setSections(prev => prev.map(section =>
+        section.id === detail.sectionId ? { ...section, isCollapsed: false } : section
+      ))
+      const el = document.getElementById(`nfr-${detail.sectionId}`)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    window.addEventListener('nfr-open-section', handler as EventListener)
+    return () => window.removeEventListener('nfr-open-section', handler as EventListener)
+  }, [])
 
   const toggleSection = useCallback((sectionId: string) => {
     setSections(prev => prev.map(section => 
@@ -163,6 +193,25 @@ const NFRAssessmentForm: React.FC = () => {
     const inputId = `${sectionId}-${question.id}`
 
     switch (question.inputType) {
+      case 'percentage-split':
+        return (
+          <PercentageSplit
+            id={inputId}
+            value={question.value}
+            onChange={(val) => updateQuestion(sectionId, question.id, val)}
+            className="mt-1"
+          />
+        )
+
+      case 'latency-targets':
+        return (
+          <LatencyTargets
+            id={inputId}
+            value={question.value}
+            onChange={(val) => updateQuestion(sectionId, question.id, val)}
+            className="mt-1"
+          />
+        )
       case 'text':
         return (
           <input
@@ -440,7 +489,7 @@ const NFRAssessmentForm: React.FC = () => {
         const hasAnswers = completion.required.completed > 0 || completion.optional.completed > 0
 
         return (
-          <div key={section.id} className="border border-gray-200 rounded-lg overflow-hidden">
+          <div key={section.id} id={`nfr-${section.id}`} className="border border-gray-200 rounded-lg overflow-hidden">
             {/* Section Header */}
             <button
               onClick={() => toggleSection(section.id)}

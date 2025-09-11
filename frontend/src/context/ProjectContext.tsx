@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import type { NFRSection, ProjectArchitectureState } from '../modules/cloud-architecture/types'
+import type { NFRSection, ProjectArchitectureState, ProjectCloudConfig, ProjectProfile } from '../modules/cloud-architecture/types'
 
 // Simple project management without multi-cloud complexity
 export interface Project {
@@ -10,6 +10,8 @@ export interface Project {
   lastModified: Date
   nfrAssessment?: NFRSection[]
   architecture?: ProjectArchitectureState
+  cloud?: ProjectCloudConfig
+  profile?: ProjectProfile
 }
 
 interface ProjectContextType {
@@ -39,7 +41,9 @@ const createEmptyProject = (id: string, name: string, description: string): Proj
   name,
   description,
   createdAt: new Date(),
-  lastModified: new Date()
+  lastModified: new Date(),
+  cloud: { provider: 'azure', cloudFamily: 'public' },
+  profile: { level: 'starter', size: 'M', criticality: 'dev/test' }
 })
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

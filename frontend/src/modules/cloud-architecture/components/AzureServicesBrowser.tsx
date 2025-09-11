@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { useDrag } from 'react-dnd'
 import { 
   ChevronDownIcon, 
@@ -8,8 +8,9 @@ import {
   CurrencyDollarIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
-import { azureServiceCatalog } from '../data/azureServices'
-import type { AzureService } from '../types'
+import { azureServiceCatalog, getServiceById } from '../data/azureServices'
+import type { AzureService, SizingLevel, ProjectArchitectureState } from '../types'
+import { useProject } from '../../../context/ProjectContext'
 
 const AzureServicesBrowser: React.FC = () => {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
@@ -17,6 +18,7 @@ const AzureServicesBrowser: React.FC = () => {
   )
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTier, setSelectedTier] = useState<string>('all')
+  const { currentProject, updateProject } = useProject()
 
   const toggleCategory = (categoryId: string) => {
     const newExpanded = new Set(expandedCategories)
@@ -37,8 +39,10 @@ const AzureServicesBrowser: React.FC = () => {
         service.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
       
       const matchesTier = selectedTier === 'all' || service.tier === selectedTier
+      const fam = currentProject?.cloud?.cloudFamily || 'public'
+      const available = service.availability ? (service.availability as any)[fam] !== false : true
 
-      return matchesSearch && matchesTier
+      return matchesSearch && matchesTier && available
     })
   }
 
@@ -130,7 +134,13 @@ const AzureServicesBrowser: React.FC = () => {
                 <div className="border-t border-architect-gray-200 bg-architect-gray-50 p-4">
                   <div className="grid gap-3">
                     {filteredServices.map((service) => (
-                      <DraggableServiceCard key={service.id} service={service} />
+                      <DraggableServiceCard
+                        key={service.id}
+                        service={service}
+                        size={getEffectiveSize(service.id, currentProject || undefined)}
+                        onSizeChange={(sz) => persistOverrideSize(updateProject, currentProject, service.id, sz)}
+                        cloudFamily={currentProject?.cloud?.cloudFamily || 'public'}
+                      />
                     ))}
                   </div>
                 </div>
@@ -159,14 +169,21 @@ const AzureServicesBrowser: React.FC = () => {
   )
 }
 
-const DraggableServiceCard: React.FC<{ service: AzureService }> = ({ service }) => {
-  const [{ isDragging }, drag] = useDrag({
+const DraggableServiceCard: React.FC<{ service: AzureService; size?: SizingLevel | ''; onSizeChange?: (s: SizingLevel | '') => void; cloudFamily: 'public'|'gov' }> = ({ service, size='M', onSizeChange, cloudFamily }) => {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const barRef = useRef<HTMLDivElement>(null)
+  const [{ isDragging }, drag, preview] = useDrag({
     type: 'azure-service',
     item: service,
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
   })
+  // Attach drag to bar, preview to whole card so the card moves during drag
+  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+  barRef.current && drag(barRef)
+  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+  cardRef.current && preview(cardRef)
 
   const getTierBadgeClass = (tier: string) => {
     switch (tier) {
@@ -188,10 +205,25 @@ const DraggableServiceCard: React.FC<{ service: AzureService }> = ({ service }) 
 
   return (
     <div
-      ref={drag}
-      className={`service-node drag-item ${isDragging ? 'opacity-50 rotate-2' : 'opacity-100'}`}
-      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+      ref={cardRef}
+      className={`service-node ${isDragging ? 'opacity-80 shadow-lg scale-[0.99]' : 'opacity-100'} transition`}
+      style={{ cursor: 'default' }}
     >
+      {/* Drag bar */}
+      <div
+        ref={barRef}
+        className={`h-5 w-full flex items-center justify-center px-2 rounded-t ${barColorFor(service.category)} cursor-grab active:cursor-grabbing`}
+        title="Drag to canvas"
+      >
+        <div className="flex gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-white/60 shadow-inner" />
+          <span className="w-1.5 h-1.5 rounded-full bg-white/60 shadow-inner" />
+          <span className="w-1.5 h-1.5 rounded-full bg-white/60 shadow-inner" />
+          <span className="w-1.5 h-1.5 rounded-full bg-white/60 shadow-inner ml-1" />
+          <span className="w-1.5 h-1.5 rounded-full bg-white/60 shadow-inner" />
+          <span className="w-1.5 h-1.5 rounded-full bg-white/60 shadow-inner" />
+        </div>
+      </div>
       {/* Service Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
@@ -215,13 +247,6 @@ const DraggableServiceCard: React.FC<{ service: AzureService }> = ({ service }) 
             )}
           </div>
         </div>
-        
-        {/* Drag Handle */}
-        <div className="text-architect-gray-400 ml-2">
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-          </svg>
-        </div>
       </div>
 
       {/* Service Description */}
@@ -240,6 +265,20 @@ const DraggableServiceCard: React.FC<{ service: AzureService }> = ({ service }) 
           <span className="text-architect-gray-500">{service.pricing.unit}</span>
         </div>
 
+        {/* Sizing */}
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-architect-gray-600">Size</span>
+          <select className="border border-architect-gray-300 rounded px-2 py-0.5" value={size} onChange={(e) => onSizeChange?.(e.target.value as SizingLevel | '')}>
+            <option value="">(Inherited)</option>
+            <option value="XS">XS</option>
+            <option value="S">S</option>
+            <option value="M">M</option>
+            <option value="L">L</option>
+            <option value="XL">XL</option>
+            <option value="Custom">Custom</option>
+          </select>
+        </div>
+
         {/* Dependencies Warning */}
         {service.requiredDependencies.length > 0 && (
           <div className="flex items-center space-x-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
@@ -248,14 +287,25 @@ const DraggableServiceCard: React.FC<{ service: AzureService }> = ({ service }) 
           </div>
         )}
 
-        {/* Optional Dependencies */}
-        {service.optionalDependencies.length > 0 && (
-          <div className="text-xs text-blue-600">
-            <span className="font-medium">Often paired with:</span>{' '}
-            <span className="text-blue-500">
-              {service.optionalDependencies.length} services
-            </span>
-          </div>
+        {/* Optional Dependencies (explicit names) */}
+        {service.optionalDependencies.length > 0 && (() => {
+          const names = service.optionalDependencies
+            .map((id) => getServiceById(id)?.name)
+            .filter(Boolean) as string[]
+          if (names.length === 0) return null
+          return (
+            <div className="text-xs text-blue-700">
+              <span className="font-medium">Often paired with:</span>{' '}
+              <span className="text-blue-600">
+                {names.slice(0, 3).join(', ')}{names.length > 3 ? `, +${names.length - 3} more` : ''}
+              </span>
+            </div>
+          )
+        })()}
+
+        {/* Availability note */}
+        {service.availability && service.availability[cloudFamily] === false && (
+          <div className="text-xs text-red-600">Not available in this cloud</div>
         )}
       </div>
 
@@ -284,6 +334,38 @@ const DraggableServiceCard: React.FC<{ service: AzureService }> = ({ service }) 
       </div>
     </div>
   )
+}
+
+function barColorFor(category: string) {
+  switch (category) {
+    case 'compute': return 'bg-blue-100'
+    case 'databases': return 'bg-green-100'
+    case 'object-storage': return 'bg-emerald-100'
+    case 'networking': return 'bg-indigo-100'
+    case 'security': return 'bg-red-100'
+    case 'messaging': return 'bg-orange-100'
+    case 'monitoring': return 'bg-purple-100'
+    case 'identity': return 'bg-teal-100'
+    default: return 'bg-architect-gray-50'
+  }
+}
+
+// Helpers
+function getEffectiveSize(serviceId: string, project?: { profile?: { size?: SizingLevel }, architecture?: ProjectArchitectureState }): SizingLevel | '' {
+  const override = project?.architecture?.overrides?.[serviceId]?.size
+  return override || ''
+}
+
+function persistOverrideSize(updateProject: (u: any)=>Promise<void>, project: any, serviceId: string, size: SizingLevel | '') {
+  const arch: ProjectArchitectureState = project?.architecture || { items: [], lastSaved: new Date().toISOString(), overrides: {} }
+  const nextOverrides = { ...(arch.overrides || {}) } as Record<string, { size?: SizingLevel; params?: Record<string, any> }>
+  if (!size) {
+    // remove override to inherit
+    delete nextOverrides[serviceId]
+  } else {
+    nextOverrides[serviceId] = { ...(nextOverrides[serviceId] || {}), size }
+  }
+  return updateProject({ architecture: { ...arch, overrides: nextOverrides, lastSaved: new Date().toISOString() } })
 }
 
 export default AzureServicesBrowser

@@ -1,6 +1,7 @@
 import React from 'react'
 import { InformationCircleIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import type { AzureService } from '../../types'
+import { useProject } from '../../../../context/ProjectContext'
 
 export interface ServiceChipProps {
   service: AzureService
@@ -18,6 +19,9 @@ const tierBadge = (tier: AzureService['tier']) => {
 }
 
 const ServiceChip: React.FC<ServiceChipProps> = ({ service, onInfo, onRemove }) => {
+  const { currentProject } = useProject()
+  const overrideSize = currentProject?.architecture?.overrides?.[service.id]?.size
+  const inheritedSize = (currentProject?.profile?.size as any) || 'M'
   return (
     <div className="inline-flex items-center max-w-full px-2.5 py-1 rounded-md border border-architect-gray-200 bg-white shadow-sm gap-2">
       <span className="text-xs font-medium text-architect-gray-900 truncate" title={service.name}>
@@ -25,6 +29,10 @@ const ServiceChip: React.FC<ServiceChipProps> = ({ service, onInfo, onRemove }) 
       </span>
       <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tierBadge(service.tier)}`}>
         {service.tier}
+      </span>
+      <span className={`text-[10px] px-1 py-0.5 rounded border ${overrideSize ? 'border-azure-blue-300 text-azure-blue-700' : 'border-architect-gray-300 text-architect-gray-600'}`}
+            title={overrideSize ? 'Override size' : 'Inherited size'}>
+        {overrideSize || inheritedSize}
       </span>
       {service.icon && (
         <span className="text-xs" aria-hidden>{service.icon}</span>
@@ -56,4 +64,3 @@ const ServiceChip: React.FC<ServiceChipProps> = ({ service, onInfo, onRemove }) 
 }
 
 export default ServiceChip
-

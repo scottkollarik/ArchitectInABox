@@ -28,30 +28,42 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     return location.pathname === path || (path === '/cloud-architecture' && location.pathname === '/')
   }
 
+  // Routes that render a joined strip under the nav; remove nav bottom border to weld
+  const joinedRoutes = [
+    '/cloud-architecture',
+    '/',
+    '/api-development',
+    '/frontend-development',
+    '/system-integration',
+    '/ai-development',
+  ]
+  const isJoined = joinedRoutes.some((p) => isActivePath(p))
+
   return (
     <div className="min-h-screen bg-architect-gray-50">
       {/* Header */}
       <header className="bg-gradient-to-r from-azure-blue-600 to-azure-blue-700 shadow-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex items-center gap-3 min-w-0">
               <Link to="/" className="flex items-center space-x-3">
                 <CloudIcon className="w-8 h-8 text-white" />
-                <div>
-                  <h1 className="text-2xl font-bold text-white">Architect in a Box</h1>
-                  <p className="text-azure-blue-100 text-sm">Professional Cloud Architecture Planning & Intelligence</p>
+                <div className="min-w-0">
+                  <h1 className="text-2xl font-bold text-white truncate">Architect in a Box</h1>
+                  <p className="text-azure-blue-100 text-sm truncate">Professional Cloud Architecture Planning & Intelligence</p>
                 </div>
               </Link>
             </div>
-            <div className="text-azure-blue-100 text-sm">
-              MVP Version 1.0
+            <div className="flex items-center gap-3">
+              <div className="hidden md:block text-azure-blue-100 text-sm">MVP Version 1.0</div>
+              <ProjectHeader compact />
             </div>
           </div>
         </div>
       </header>
 
       {/* Navigation */}
-      <nav className="bg-white border-b border-architect-gray-200 shadow-sm">
+      <nav className={`bg-white ${isJoined ? 'border-b-0 pb-0' : 'border-b border-architect-gray-200'} shadow-sm`}>
         <div className="container mx-auto px-4">
           <div className="flex space-x-1">
             {navigationItems.map((item) => {
@@ -60,14 +72,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-colors duration-200 border-b-2 ${
+                  className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-all duration-300 ${
                     isActivePath(item.path)
-                      ? 'text-azure-blue-600 border-azure-blue-600 bg-azure-blue-50'
-                      : 'text-architect-gray-600 border-transparent hover:text-azure-blue-600 hover:border-azure-blue-300'
+                      ? 'text-azure-blue-700 bg-azure-blue-50 border border-azure-blue-300 border-b-0 rounded-t-md -mb-px z-10'
+                      : 'text-architect-gray-600 border-b-2 border-transparent hover:text-azure-blue-600 hover:border-azure-blue-300'
                   }`}
                 >
                   <IconComponent className="w-5 h-5" />
-                  <span>{item.name}</span>
+                  <span
+                    data-nav-label={item.path.replace('/', '') || 'home'}
+                    className={`${isActivePath(item.path) ? 'hidden' : ''}`}
+                  >
+                    {item.name}
+                  </span>
                 </Link>
               )
             })}
@@ -75,11 +92,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </nav>
 
-      {/* Project Header */}
-      <ProjectHeader />
+      {/* Project Header moved into top header */}
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-4 pt-0 pb-6">
         {children}
       </main>
 

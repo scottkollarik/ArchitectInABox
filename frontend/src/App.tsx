@@ -4,6 +4,10 @@ import { HTML5Backend } from 'react-dnd-html5-backend'
 import { ProjectProvider } from './context/ProjectContext'
 import Layout from './components/Layout'
 import CloudArchitecturePage from './modules/cloud-architecture/pages/CloudArchitecturePage'
+import APIDevelopmentPage from './modules/api-development/pages/APIDevelopmentPage'
+import FrontendDevelopmentPage from './modules/frontend-development/pages/FrontendDevelopmentPage'
+import SystemIntegrationPage from './modules/system-integration/pages/SystemIntegrationPage'
+import AIDevelopmentPage from './modules/ai-development/pages/AIDevelopmentPage'
 
 function App() {
   return (
@@ -15,10 +19,10 @@ function App() {
               <Route path="/" element={<CloudArchitecturePage />} />
               <Route path="/cloud-architecture" element={<CloudArchitecturePage />} />
               {/* Future routes */}
-              <Route path="/api-development" element={<div className="p-8 text-center text-gray-500">API Development module coming soon...</div>} />
-              <Route path="/frontend-development" element={<div className="p-8 text-center text-gray-500">Frontend Development module coming soon...</div>} />
-              <Route path="/system-integration" element={<div className="p-8 text-center text-gray-500">System Integration module coming soon...</div>} />
-              <Route path="/ai-development" element={<div className="p-8 text-center text-gray-500">AI Development module coming soon...</div>} />
+              <Route path="/api-development" element={<APIDevelopmentPage />} />
+              <Route path="/frontend-development" element={<FrontendDevelopmentPage />} />
+              <Route path="/system-integration" element={<SystemIntegrationPage />} />
+              <Route path="/ai-development" element={<AIDevelopmentPage />} />
             </Routes>
           </Layout>
         </Router>

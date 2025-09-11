@@ -2,7 +2,7 @@
 export interface NFRQuestion {
   id: string
   text: string
-  inputType: 'text' | 'select' | 'number' | 'checkbox' | 'multiselect' | 'compound' | 'card-list' | 'numeric-with-units' | 'conditional-fieldset' | 'azure-region'
+  inputType: 'text' | 'select' | 'number' | 'checkbox' | 'multiselect' | 'compound' | 'card-list' | 'numeric-with-units' | 'conditional-fieldset' | 'azure-region' | 'percentage-split' | 'latency-targets' | 'size-range'
   isRequired: boolean
   isOptional: boolean
   isCompleted: boolean
@@ -87,6 +87,8 @@ export interface AzureService {
   tags?: string[]
   documentation?: string
   icon?: string
+  availability?: { public?: boolean; gov?: boolean }
+  alternatives?: { gov?: string }
 }
 
 export interface AzureServiceCategory {
@@ -126,6 +128,14 @@ export interface ArchitectureItemPersisted {
 export interface ProjectArchitectureState {
   items: ArchitectureItemPersisted[]
   lastSaved: string
+  overrides?: Record<string, ArchitectureServiceOverride>
+}
+
+export type SizingLevel = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'Custom'
+
+export interface ArchitectureServiceOverride {
+  size?: SizingLevel
+  params?: Record<string, any>
 }
 
 export interface ArchitectureRecommendation {
@@ -302,4 +312,22 @@ export interface ConditionalRule {
   targetField: string
   value?: any
   options?: string[]
+}
+
+// Project-level cloud and profile
+export interface ProjectCloudConfig {
+  provider: 'azure'
+  cloudFamily: 'public' | 'gov'
+  primaryRegionId?: string
+  secondaryRegionId?: string
+  policies?: {
+    residency?: 'in-country' | 'in-geo' | 'no-restriction' | 'custom'
+    countries?: string[]
+  }
+}
+
+export interface ProjectProfile {
+  level: 'starter' | 'standard' | 'enterprise' | 'custom'
+  size: SizingLevel
+  criticality: 'dev/test' | 'prod' | 'regulated'
 }
