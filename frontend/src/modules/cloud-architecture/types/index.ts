@@ -2,7 +2,7 @@
 export interface NFRQuestion {
   id: string
   text: string
-  inputType: 'text' | 'select' | 'number' | 'checkbox' | 'multiselect' | 'compound' | 'card-list'
+  inputType: 'text' | 'select' | 'number' | 'checkbox' | 'multiselect' | 'compound' | 'card-list' | 'numeric-with-units' | 'conditional-fieldset' | 'azure-region'
   isRequired: boolean
   isOptional: boolean
   isCompleted: boolean
@@ -15,6 +15,14 @@ export interface NFRQuestion {
   helpText?: string
   compoundFields?: CompoundField[]
   cardConfig?: CardConfig
+  // New properties for structured inputs
+  units?: string[]
+  defaultUnit?: string
+  min?: number
+  max?: number
+  allowDecimals?: boolean
+  conditionalFields?: ConditionalField[]
+  conditionalRules?: ConditionalRule[]
 }
 
 export interface CompoundField {
@@ -107,6 +115,17 @@ export interface ArchitectureConfiguration {
   createdAt: Date
   lastModified: Date
   version: string
+}
+
+// Lightweight persisted architecture for projects
+export interface ArchitectureItemPersisted {
+  id: string
+  isAutoIncluded?: boolean
+}
+
+export interface ProjectArchitectureState {
+  items: ArchitectureItemPersisted[]
+  lastSaved: string
 }
 
 export interface ArchitectureRecommendation {
@@ -250,4 +269,37 @@ export interface APIError {
   message: string
   code: string
   details?: any
+}
+
+// Structured Input Types
+export interface NumericWithUnitsValue {
+  value: number | ''
+  unit: string
+}
+
+export interface ConditionalField {
+  id: string
+  type: 'text' | 'select' | 'numeric-with-units' | 'multiselect'
+  label: string
+  placeholder?: string
+  options?: string[]
+  units?: string[]
+  defaultUnit?: string
+  defaultValue?: any
+  required?: boolean
+  disabled?: boolean
+  visible?: boolean
+  helpText?: string
+  min?: number
+  max?: number
+  allowDecimals?: boolean
+}
+
+export interface ConditionalRule {
+  triggerField: string
+  triggerValue: string | string[]
+  action: 'show' | 'hide' | 'enable' | 'disable' | 'setValue' | 'setOptions'
+  targetField: string
+  value?: any
+  options?: string[]
 }

@@ -10,6 +10,9 @@ import {
 import { nfrSections, getSectionCompletion, getOverallCompletion } from '../data/nfrData'
 import type { NFRSection, NFRQuestion } from '../types'
 import { useProject } from '../../../context/ProjectContext'
+import NumericWithUnits from './inputs/NumericWithUnits'
+import ConditionalFieldSet from './inputs/ConditionalFieldSet'
+import AzureRegionSelector from './inputs/AzureRegionSelector'
 
 const NFRAssessmentForm: React.FC = () => {
   const { currentProject, updateProject } = useProject()
@@ -353,6 +356,48 @@ const NFRAssessmentForm: React.FC = () => {
               </p>
             )}
           </div>
+        )
+
+      case 'numeric-with-units':
+        return (
+          <NumericWithUnits
+            id={inputId}
+            value={question.value}
+            onChange={(value) => updateQuestion(sectionId, question.id, value)}
+            units={question.units || ['units']}
+            defaultUnit={question.defaultUnit}
+            placeholder={question.placeholder}
+            min={question.min}
+            max={question.max}
+            allowDecimals={question.allowDecimals}
+            className="mt-1"
+          />
+        )
+
+      case 'conditional-fieldset':
+        return (
+          <ConditionalFieldSet
+            id={inputId}
+            fields={question.conditionalFields || []}
+            rules={question.conditionalRules || []}
+            values={question.value || {}}
+            onChange={(fieldId, value) => {
+              const currentValues = question.value || {}
+              const newValues = { ...currentValues, [fieldId]: value }
+              updateQuestion(sectionId, question.id, newValues)
+            }}
+            className="mt-1"
+          />
+        )
+
+      case 'azure-region':
+        return (
+          <AzureRegionSelector
+            id={inputId}
+            value={question.value}
+            onChange={(value) => updateQuestion(sectionId, question.id, value)}
+            className="mt-1"
+          />
         )
 
       default:

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import type { NFRSection } from '../modules/cloud-architecture/types'
+import type { NFRSection, ProjectArchitectureState } from '../modules/cloud-architecture/types'
 
 // Simple project management without multi-cloud complexity
 export interface Project {
@@ -9,6 +9,7 @@ export interface Project {
   createdAt: Date
   lastModified: Date
   nfrAssessment?: NFRSection[]
+  architecture?: ProjectArchitectureState
 }
 
 interface ProjectContextType {
@@ -19,6 +20,7 @@ interface ProjectContextType {
   updateProject: (updates: Partial<Project>) => Promise<void>
   deleteProject: (projectId: string) => Promise<void>
   saveProject: () => Promise<void>
+  setArchitecture: (arch: ProjectArchitectureState) => Promise<void>
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
@@ -131,6 +133,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     ))
   }
 
+  const setArchitecture = async (arch: ProjectArchitectureState): Promise<void> => {
+    if (!currentProject) return
+    const updated = { ...currentProject, architecture: arch, lastModified: new Date() }
+    setCurrentProject(updated)
+    setProjects(prev => prev.map(p => (p.id === updated.id ? updated : p)))
+  }
+
   return (
     <ProjectContext.Provider value={{
       currentProject,
@@ -139,7 +148,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       loadProject,
       updateProject,
       deleteProject,
-      saveProject
+      saveProject,
+      setArchitecture
     }}>
       {children}
     </ProjectContext.Provider>

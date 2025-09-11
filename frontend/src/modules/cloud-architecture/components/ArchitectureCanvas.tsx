@@ -1,20 +1,18 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { useDrop } from 'react-dnd'
-import { 
-  TrashIcon, 
-  ExclamationTriangleIcon, 
-  CheckCircleIcon,
-  InformationCircleIcon,
-  CurrencyDollarIcon,
-  ArrowPathIcon
-} from '@heroicons/react/24/outline'
-import type { AzureService, SelectedService } from '../types'
-import { getServiceById } from '../data/azureServices'
+import { CurrencyDollarIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
+import type { AzureService, SelectedService, ProjectArchitectureState } from '../types'
+import { getServiceById, azureServiceCatalog } from '../data/azureServices'
+import { useProject } from '../../../context/ProjectContext'
+import ArchitectureSection from './architecture/ArchitectureSection'
+import DetailsDrawer from './architecture/DetailsDrawer'
 
 const ArchitectureCanvas: React.FC = () => {
   const [selectedServices, setSelectedServices] = useState<SelectedService[]>([])
   const [autoIncludedServices, setAutoIncludedServices] = useState<Set<string>>(new Set())
   const [notifications, setNotifications] = useState<{ id: string; message: string; type: 'info' | 'warning' | 'success' }[]>([])
+  const [detailsService, setDetailsService] = useState<AzureService | null>(null)
+  const { currentProject, setArchitecture } = useProject()
 
   const addNotification = (message: string, type: 'info' | 'warning' | 'success' = 'info') => {
     const id = Date.now().toString()
@@ -24,16 +22,7 @@ const ArchitectureCanvas: React.FC = () => {
     }, 5000)
   }
 
-  const [{ isOver, canDrop }, drop] = useDrop({
-    accept: 'azure-service',
-    drop: (service: AzureService) => {
-      handleServiceDrop(service)
-    },
-    collect: (monitor) => ({
-      isOver: monitor.isOver(),
-      canDrop: monitor.canDrop(),
-    }),
-  })
+  // Drop handling is per-category via CategoryDropLane
 
   const handleServiceDrop = useCallback((service: AzureService) => {
     // Check if service already exists
@@ -136,9 +125,7 @@ const ArchitectureCanvas: React.FC = () => {
     addNotification(`Removed ${service.name} from architecture`, 'info')
   }, [selectedServices])
 
-  const getServicesByRole = (role: string) => {
-    return selectedServices.filter(s => s.architectureRole === role)
-  }
+  // Grouping by role was replaced by category-based sections
 
   const calculateEstimatedCost = () => {
     return selectedServices.reduce((total, service) => {
@@ -153,6 +140,62 @@ const ArchitectureCanvas: React.FC = () => {
     setSelectedServices([])
     setAutoIncludedServices(new Set())
     addNotification('Architecture cleared', 'info')
+  }
+
+  const onInfo = (service: AzureService) => setDetailsService(service)
+  const onRemoveChip = (service: AzureService) => removeService(service.id)
+
+  // Group by category for compact sectioned layout
+  const servicesByCategory = useMemo(() => {
+    const groups: Record<string, AzureService[]> = {}
+    selectedServices.forEach(s => {
+      if (!groups[s.category]) groups[s.category] = []
+      groups[s.category].push(s)
+    })
+    return groups
+  }, [selectedServices])
+
+  // Persist to project when selection changes
+  useEffect(() => {
+    if (!currentProject) return
+    const arch: ProjectArchitectureState = {
+      items: selectedServices.map(s => ({ id: s.id, isAutoIncluded: s.isAutoIncluded })),
+      lastSaved: new Date().toISOString(),
+    }
+    setArchitecture(arch)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedServices, currentProject?.id])
+
+  // Rehydrate from project on mount/change
+  useEffect(() => {
+    if (!currentProject?.architecture) return
+    const items = currentProject.architecture.items
+    const rebuilt: SelectedService[] = []
+    const auto = new Set<string>()
+    items.forEach(({ id, isAutoIncluded }) => {
+      const base = getServiceById(id)
+      if (base) {
+        rebuilt.push({ ...base, isAutoIncluded: Boolean(isAutoIncluded), addedAt: new Date(), requiredBy: [] })
+        if (isAutoIncluded) auto.add(id)
+      }
+    })
+    setSelectedServices(rebuilt)
+    setAutoIncludedServices(auto)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProject?.id])
+
+  const categoryLabel = (category: string) => {
+    switch (category) {
+      case 'compute': return 'Compute'
+      case 'databases': return 'Databases'
+      case 'object-storage': return 'Object & File Storage'
+      case 'networking': return 'Networking'
+      case 'security': return 'Security'
+      case 'monitoring': return 'Monitoring'
+      case 'identity': return 'Identity'
+      case 'messaging': return 'Messaging & Caching'
+      default: return category.charAt(0).toUpperCase() + category.slice(1)
+    }
   }
 
   // Update quick stats in the parent component
@@ -190,26 +233,15 @@ const ArchitectureCanvas: React.FC = () => {
         </div>
       )}
 
-      {/* Drop Zone */}
-      <div
-        ref={drop}
-        className={`drop-zone min-h-48 p-4 rounded-lg transition-all duration-200 ${
-          isOver && canDrop ? 'drag-over' : 
-          canDrop ? 'border-azure-blue-200 bg-azure-blue-25' : 
-          'border-architect-gray-300 bg-white'
-        }`}
-      >
+      {/* Drop Zone (container wraps category lanes) */}
+      <div className="drop-zone min-h-48 p-4 rounded-lg transition-all duration-200 border-architect-gray-300 bg-white">
         {selectedServices.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 text-center">
             <div className="w-16 h-16 rounded-full bg-architect-gray-100 flex items-center justify-center mb-3">
               <ArrowPathIcon className="w-8 h-8 text-architect-gray-400" />
             </div>
-            <p className="text-sm font-medium text-architect-gray-600 mb-1">
-              Drop Azure services here
-            </p>
-            <p className="text-xs text-architect-gray-500">
-              Dependencies will be automatically included
-            </p>
+            <p className="text-sm font-medium text-architect-gray-600 mb-1">Drop Azure services into the matching sections below</p>
+            <p className="text-xs text-architect-gray-500">Dependencies will be automatically included</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -226,35 +258,23 @@ const ArchitectureCanvas: React.FC = () => {
               </button>
             </div>
 
-            {/* Core Services */}
-            {getServicesByRole('core').length > 0 && (
-              <ServiceGroup 
-                title="Core Services" 
-                services={getServicesByRole('core')}
-                icon={<CheckCircleIcon className="w-4 h-4 text-green-600" />}
-                onRemove={removeService}
-              />
-            )}
-
-            {/* Supporting Services */}
-            {getServicesByRole('supporting').length > 0 && (
-              <ServiceGroup 
-                title="Supporting Services" 
-                services={getServicesByRole('supporting')}
-                icon={<InformationCircleIcon className="w-4 h-4 text-blue-600" />}
-                onRemove={removeService}
-              />
-            )}
-
-            {/* Optional Services */}
-            {getServicesByRole('optional').length > 0 && (
-              <ServiceGroup 
-                title="Optional Services" 
-                services={getServicesByRole('optional')}
-                icon={<ExclamationTriangleIcon className="w-4 h-4 text-yellow-600" />}
-                onRemove={removeService}
-              />
-            )}
+            {/* Sectioned by Category (compact chips) with drop lanes */}
+            <div className="space-y-4">
+              {Object.keys(azureServiceCatalog).map((catKey) => {
+                const list = servicesByCategory[catKey] || []
+                return (
+                  <CategoryDropLane
+                    key={catKey}
+                    categoryId={catKey}
+                    title={categoryLabel(catKey)}
+                    services={list}
+                    onDropService={handleServiceDrop}
+                    onInfo={onInfo}
+                    onRemove={onRemoveChip}
+                  />
+                )
+              })}
+            </div>
 
             {/* Cost Summary */}
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-4">
@@ -274,111 +294,40 @@ const ArchitectureCanvas: React.FC = () => {
           </div>
         )}
       </div>
+      <DetailsDrawer service={detailsService} onClose={() => setDetailsService(null)} />
     </div>
   )
 }
 
-const ServiceGroup: React.FC<{
+const CategoryDropLane: React.FC<{
+  categoryId: string
   title: string
-  services: SelectedService[]
-  icon: React.ReactNode
-  onRemove: (serviceId: string) => void
-}> = ({ title, services, icon, onRemove }) => {
-  return (
-    <div>
-      <div className="flex items-center space-x-2 mb-2">
-        {icon}
-        <h4 className="text-sm font-semibold text-architect-gray-800">{title}</h4>
-        <span className="text-xs text-architect-gray-500">({services.length})</span>
-      </div>
-      <div className="space-y-1">
-        {services.map((service) => (
-          <ServiceNode
-            key={service.id}
-            service={service}
-            onRemove={() => onRemove(service.id)}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-const ServiceNode: React.FC<{
-  service: SelectedService
-  onRemove: () => void
-}> = ({ service, onRemove }) => {
-  const [showDetails, setShowDetails] = useState(false)
+  services: AzureService[]
+  onDropService: (s: AzureService) => void
+  onInfo: (s: AzureService) => void
+  onRemove: (s: AzureService) => void
+}> = ({ categoryId, title, services, onDropService, onInfo, onRemove }) => {
+  const [{ isOver, canDrop }, drop] = useDrop({
+    accept: 'azure-service',
+    canDrop: (item: AzureService) => item.category === categoryId,
+    drop: (item: AzureService, monitor) => {
+      if (monitor.canDrop()) onDropService(item)
+    },
+    collect: (monitor) => ({ isOver: monitor.isOver(), canDrop: monitor.canDrop() }),
+  })
 
   return (
-    <div className={`service-node group ${service.isAutoIncluded ? 'auto-included' : ''}`}>
-      {/* Service Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2">
-            <h5 className="text-sm font-medium text-architect-gray-900 truncate">
-              {service.name}
-            </h5>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${
-              service.tier === 'PaaS' ? 'bg-green-100 text-green-700' :
-              service.tier === 'IaaS' ? 'bg-yellow-100 text-yellow-700' :
-              'bg-purple-100 text-purple-700'
-            }`}>
-              {service.tier}
-            </span>
-            {service.isAutoIncluded && (
-              <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
-                Auto
-              </span>
-            )}
-          </div>
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-xs text-architect-gray-600 truncate">
-              {service.description}
-            </p>
-            <span className="text-xs text-green-600 font-medium ml-2">
-              {service.pricing.estimate}
-            </span>
-          </div>
-        </div>
-        
-        {/* Actions */}
-        <div className="flex items-center space-x-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <button
-            onClick={() => setShowDetails(!showDetails)}
-            className="p-1 text-architect-gray-400 hover:text-architect-gray-600"
-            title="Toggle details"
-          >
-            <InformationCircleIcon className="w-3 h-3" />
-          </button>
-          <button
-            onClick={onRemove}
-            className="p-1 text-red-400 hover:text-red-600"
-            title="Remove service"
-            disabled={service.isAutoIncluded}
-          >
-            <TrashIcon className="w-3 h-3" />
-          </button>
-        </div>
-      </div>
-
-      {/* Service Details */}
-      {showDetails && (
-        <div className="mt-2 pt-2 border-t border-architect-gray-200 text-xs animate-fade-in">
-          <div className="space-y-1 text-architect-gray-600">
-            <p><strong>Role:</strong> {service.architectureRole}</p>
-            <p><strong>Added:</strong> {service.addedAt.toLocaleTimeString()}</p>
-            {service.requiredBy && service.requiredBy.length > 0 && (
-              <p><strong>Required by:</strong> {service.requiredBy.length} services</p>
-            )}
-            {service.tags && service.tags.length > 0 && (
-              <p><strong>Tags:</strong> {service.tags.slice(0, 3).join(', ')}</p>
-            )}
-          </div>
-        </div>
+    <div ref={drop} className={`rounded-lg p-3 border ${isOver && canDrop ? 'border-azure-blue-300 bg-azure-blue-25' : 'border-architect-gray-200 bg-white'}`}>
+      <ArchitectureSection title={title} services={services} onInfo={onInfo} onRemove={onRemove} />
+      {services.length === 0 && (
+        <p className="text-xs text-architect-gray-500">Drop {title} services here</p>
       )}
     </div>
   )
 }
+
+// Legacy ServiceGroup removed in favor of compact category sections
+
+// Legacy ServiceNode removed in favor of ServiceChip in ArchitectureSection
 
 export default ArchitectureCanvas

@@ -74,17 +74,17 @@ export const azureServiceCatalog: AzureServiceCatalog = {
       }
     ]
   },
-  storage: {
-    id: 'storage',
-    name: 'Storage & Data Services',
-    description: 'Database and storage solutions',
-    icon: '💾',
+  databases: {
+    id: 'databases',
+    name: 'Databases',
+    description: 'Relational, document, and multi-model databases',
+    icon: '🗄️',
     color: 'green',
     services: [
       {
         id: 'azure-sql-hyperscale',
         name: 'Azure SQL Database Hyperscale',
-        category: 'storage',
+        category: 'databases',
         tier: 'PaaS',
         description: 'Relational/transactional with read scale; failover groups for DR',
         longDescription: 'Highly scalable SQL database with up to 100TB storage and read scale-out replicas.',
@@ -105,7 +105,7 @@ export const azureServiceCatalog: AzureServiceCatalog = {
       {
         id: 'cosmos-db',
         name: 'Azure Cosmos DB',
-        category: 'storage',
+        category: 'databases',
         tier: 'PaaS',
         description: 'Global document/kv with tunable consistency (often Session consistency)',
         longDescription: 'Globally distributed, multi-model database with SLA-backed consistency and availability.',
@@ -123,10 +123,19 @@ export const azureServiceCatalog: AzureServiceCatalog = {
         tags: ['nosql', 'global', 'multi-model', 'consistency'],
         documentation: 'https://docs.microsoft.com/azure/cosmos-db/'
       },
+    ]
+  },
+  'object-storage': {
+    id: 'object-storage',
+    name: 'Object & File Storage',
+    description: 'Blob/object storage, files, and data lake',
+    icon: '💾',
+    color: 'emerald',
+    services: [
       {
         id: 'blob-storage',
         name: 'Azure Blob Storage',
-        category: 'storage',
+        category: 'object-storage',
         tier: 'PaaS',
         description: 'Object storage for files, images, logs; lifecycle policies',
         longDescription: 'Massively scalable object storage with hot, cool, and archive access tiers.',

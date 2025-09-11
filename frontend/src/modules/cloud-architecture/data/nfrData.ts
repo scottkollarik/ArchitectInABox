@@ -11,13 +11,13 @@ export const nfrSections: NFRSection[] = [
       {
         id: 'expected-rps',
         text: 'What is the expected throughput (requests per second)?',
-        inputType: 'number',
+        inputType: 'text',
         isRequired: true,
         isOptional: false,
         isCompleted: false,
         architectureImpact: 'critical',
-        placeholder: 'e.g., 1000',
-        helpText: 'Peak requests per second your application needs to handle'
+        placeholder: 'e.g., 1,000',
+        helpText: 'Peak requests per second your application needs to handle (large numbers allowed, no stepper)'
       },
       {
         id: 'traffic-pattern',
@@ -33,36 +33,73 @@ export const nfrSections: NFRSection[] = [
       {
         id: 'peak-vs-average',
         text: 'What are peak vs average RPS?',
-        inputType: 'text',
+        inputType: 'compound',
         isRequired: true,
         isOptional: false,
         isCompleted: false,
         dependsOn: ['traffic-pattern'],
         architectureImpact: 'important',
-        placeholder: 'e.g., Peak: 5000 RPS, Average: 500 RPS',
-        helpText: 'Helps determine autoscaling requirements'
+        helpText: 'Separate values feed capacity planning and autoscaling',
+        compoundFields: [
+          {
+            id: 'average-rps',
+            label: 'Average RPS',
+            type: 'text',
+            placeholder: '1,000'
+          },
+          {
+            id: 'peak-rps',
+            label: 'Peak RPS',
+            type: 'text',
+            placeholder: '5,000'
+          }
+        ]
       },
       {
         id: 'latency-targets',
-        text: 'What are latency targets (p95, p99 in milliseconds)?',
-        inputType: 'text',
+        text: 'Latency targets for user experience?',
+        inputType: 'compound',
         isRequired: true,
         isOptional: false,
         isCompleted: false,
         architectureImpact: 'critical',
-        placeholder: 'e.g., p95: 200ms, p99: 500ms',
-        helpText: 'Performance percentiles for user experience'
+        helpText: 'Performance percentiles - P95 should be lower than P99',
+        compoundFields: [
+          {
+            id: 'p95-value',
+            label: 'P95 Latency',
+            type: 'number',
+            placeholder: '200'
+          },
+          {
+            id: 'p95-unit',
+            label: 'Unit',
+            type: 'select',
+            options: ['ms', 'seconds']
+          },
+          {
+            id: 'p99-value',
+            label: 'P99 Latency',
+            type: 'number',
+            placeholder: '500'
+          },
+          {
+            id: 'p99-unit',
+            label: 'Unit',
+            type: 'select',
+            options: ['ms', 'seconds']
+          }
+        ]
       },
       {
-        id: 'geo-distribution',
-        text: 'Geo distribution of users? Primary regions?',
-        inputType: 'multiselect',
-        isRequired: false,
-        isOptional: true,
+        id: 'region-selection',
+        text: 'Select primary Azure region and DR strategy',
+        inputType: 'azure-region',
+        isRequired: true,
+        isOptional: false,
         isCompleted: false,
-        architectureImpact: 'important',
-        options: ['North America', 'Europe', 'Asia Pacific', 'South America', 'Africa', 'Australia'],
-        helpText: 'Determines CDN and multi-region deployment needs'
+        architectureImpact: 'critical',
+        helpText: 'Paired region suggestion follows Azure paired region guidance'
       },
       {
         id: 'data-residency',
@@ -138,6 +175,152 @@ export const nfrSections: NFRSection[] = [
         }
       },
       {
+        id: 'data-growth',
+        text: 'Data growth rate and retention',
+        inputType: 'compound',
+        isRequired: false,
+        isOptional: true,
+        isCompleted: false,
+        architectureImpact: 'important',
+        helpText: 'Amount per period and overall retention help size storage and lifecycle policies',
+        compoundFields: [
+          { id: 'growth-amount', label: 'Growth Amount', type: 'text', placeholder: '100' },
+          { id: 'growth-unit', label: 'Unit', type: 'select', options: ['GB', 'TB', 'PB'] },
+          { id: 'growth-period', label: 'Per', type: 'select', options: ['month', 'quarter', 'year'] },
+          { id: 'retention-amount', label: 'Retention', type: 'text', placeholder: '7' },
+          { id: 'retention-unit', label: 'Unit', type: 'select', options: ['months', 'years'] }
+        ]
+      },
+      {
+        id: 'data-storage-config',
+        text: 'Configure your primary data storage?',
+        inputType: 'conditional-fieldset',
+        isRequired: true,
+        isOptional: false,
+        isCompleted: false,
+        architectureImpact: 'critical',
+        helpText: 'Smart configuration based on your data model choice',
+        conditionalFields: [
+          {
+            id: 'storage-type',
+            type: 'select',
+            label: 'Primary Storage Type',
+            options: ['Relational (SQL)', 'Document (NoSQL)', 'Key-value', 'Blob/File Storage', 'Time-series'],
+            required: true,
+            visible: true
+          },
+          {
+            id: 'consistency-requirement',
+            type: 'select',
+            label: 'Consistency Requirements',
+            options: ['Strong (ACID)', 'Bounded-staleness', 'Session', 'Eventual'],
+            required: true,
+            visible: false
+          },
+          {
+            id: 'document-size',
+            type: 'numeric-with-units',
+            label: 'Typical Document Size',
+            units: ['B', 'KB', 'MB', 'GB'],
+            defaultUnit: 'KB',
+            required: false,
+            visible: false,
+            helpText: 'Average size per document/record'
+          },
+          {
+            id: 'file-size',
+            type: 'numeric-with-units',
+            label: 'Typical File Size',
+            units: ['MB', 'GB', 'TB'],
+            defaultUnit: 'MB',
+            required: false,
+            visible: false,
+            helpText: 'Average size per file'
+          },
+          {
+            id: 'indexing-strategy',
+            type: 'multiselect',
+            label: 'Indexing Requirements',
+            options: ['Primary Key', 'Secondary Indexes', 'Full-text Search', 'Geospatial', 'Time-based'],
+            required: false,
+            visible: false
+          },
+          {
+            id: 'access-pattern',
+            type: 'select',
+            label: 'Primary Access Pattern',
+            options: ['Random Access', 'Sequential Read', 'Bulk Operations', 'Real-time Analytics'],
+            required: false,
+            visible: false
+          }
+        ],
+        conditionalRules: [
+          {
+            triggerField: 'storage-type',
+            triggerValue: 'Relational (SQL)',
+            action: 'show',
+            targetField: 'consistency-requirement'
+          },
+          {
+            triggerField: 'storage-type',
+            triggerValue: 'Relational (SQL)',
+            action: 'setValue',
+            targetField: 'consistency-requirement',
+            value: 'Strong (ACID)'
+          },
+          {
+            triggerField: 'storage-type',
+            triggerValue: 'Relational (SQL)',
+            action: 'show',
+            targetField: 'indexing-strategy'
+          },
+          {
+            triggerField: 'storage-type',
+            triggerValue: ['Document (NoSQL)', 'Key-value'],
+            action: 'show',
+            targetField: 'consistency-requirement'
+          },
+          {
+            triggerField: 'storage-type',
+            triggerValue: ['Document (NoSQL)', 'Key-value'],
+            action: 'show',
+            targetField: 'document-size'
+          },
+          {
+            triggerField: 'storage-type',
+            triggerValue: 'Blob/File Storage',
+            action: 'show',
+            targetField: 'file-size'
+          },
+          {
+            triggerField: 'storage-type',
+            triggerValue: 'Blob/File Storage',
+            action: 'setValue',
+            targetField: 'consistency-requirement',
+            value: 'Eventual'
+          },
+          {
+            triggerField: 'storage-type',
+            triggerValue: 'Blob/File Storage',
+            action: 'show',
+            targetField: 'access-pattern'
+          },
+          {
+            triggerField: 'storage-type',
+            triggerValue: 'Time-series',
+            action: 'setValue',
+            targetField: 'consistency-requirement',
+            value: 'Eventual'
+          },
+          {
+            triggerField: 'storage-type',
+            triggerValue: 'Time-series',
+            action: 'show',
+            targetField: 'access-pattern'
+          }
+        ]
+      },
+      {
         id: 'consistency-level',
         text: 'Required consistency?',
         inputType: 'select',
@@ -151,24 +334,52 @@ export const nfrSections: NFRSection[] = [
       {
         id: 'read-write-ratio',
         text: 'Read/write ratio?',
-        inputType: 'text',
+        inputType: 'compound',
         isRequired: true,
         isOptional: false,
         isCompleted: false,
         architectureImpact: 'important',
-        placeholder: 'e.g., 80% reads, 20% writes',
-        helpText: 'Influences caching and database optimization strategies'
+        helpText: 'Percentages should total 100%',
+        compoundFields: [
+          { id: 'read-percent', label: 'Reads %', type: 'text', placeholder: '80' },
+          { id: 'write-percent', label: 'Writes %', type: 'text', placeholder: '20' }
+        ]
       },
       {
         id: 'item-size',
-        text: 'Typical item/document size?',
-        inputType: 'text',
+        text: 'Typical item/document size ranges?',
+        inputType: 'compound',
         isRequired: false,
         isOptional: true,
         isCompleted: false,
         architectureImpact: 'important',
-        placeholder: 'e.g., 2KB average, 10MB max',
-        helpText: 'Affects storage and transfer optimization'
+        helpText: 'Affects storage and transfer optimization strategies',
+        compoundFields: [
+          {
+            id: 'average-size',
+            label: 'Average Size',
+            type: 'number',
+            placeholder: '2'
+          },
+          {
+            id: 'average-unit',
+            label: 'Unit',
+            type: 'select',
+            options: ['B', 'KB', 'MB', 'GB']
+          },
+          {
+            id: 'max-size',
+            label: 'Maximum Size',
+            type: 'number',
+            placeholder: '10'
+          },
+          {
+            id: 'max-unit',
+            label: 'Unit',
+            type: 'select',
+            options: ['B', 'KB', 'MB', 'GB']
+          }
+        ]
       },
       {
         id: 'data-growth',
@@ -520,13 +731,17 @@ export const nfrSections: NFRSection[] = [
       {
         id: 'monthly-budget',
         text: 'Monthly budget estimate?',
-        inputType: 'text',
+        inputType: 'numeric-with-units',
         isRequired: false,
         isOptional: true,
         isCompleted: false,
         architectureImpact: 'important',
-        placeholder: 'e.g., $5,000/month',
-        helpText: 'Helps constrain service selection and tier choices'
+        placeholder: '5000',
+        helpText: 'Helps constrain service selection and tier choices',
+        units: ['USD', 'EUR', 'GBP', 'CAD', 'AUD'],
+        defaultUnit: 'USD',
+        min: 0,
+        allowDecimals: true
       },
       {
         id: 'licensing-constraints',
