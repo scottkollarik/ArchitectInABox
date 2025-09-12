@@ -179,9 +179,13 @@ const ArchitectureCanvas: React.FC = () => {
   // Persist to project when selection changes
   useEffect(() => {
     if (!currentProject) return
+    const existing = currentProject.architecture?.items || []
+    // Avoid overwriting a non-empty saved architecture with an initial empty render
+    if (selectedServices.length === 0 && existing.length > 0) return
     const arch: ProjectArchitectureState = {
       items: selectedServices.map(s => ({ id: s.id, isAutoIncluded: s.isAutoIncluded })),
       lastSaved: new Date().toISOString(),
+      overrides: currentProject.architecture?.overrides || {}
     }
     setArchitecture(arch)
     // eslint-disable-next-line react-hooks/exhaustive-deps
