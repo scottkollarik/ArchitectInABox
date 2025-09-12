@@ -32,6 +32,28 @@ export const azureServiceCatalog: AzureServiceCatalog = {
         availability: { public: true, gov: true }
       },
       {
+        id: 'azure-functions',
+        name: 'Azure Functions',
+        category: 'compute',
+        tier: 'PaaS',
+        description: 'Serverless event-driven compute for background jobs and APIs',
+        longDescription: 'Run small pieces of code without managing servers. Triggers for HTTP, queues, events. Scales automatically.',
+        requiredDependencies: ['managed-identity'],
+        optionalDependencies: ['service-bus', 'event-hubs', 'key-vault', 'blob-storage'],
+        conflictsWith: [],
+        nfrRequirements: ['serverless-acceptable', 'request-types'],
+        architectureRole: 'supporting',
+        pricing: {
+          tier: 'Consumption',
+          estimate: '$0.20/million executions',
+          unit: 'per execution',
+          calculator: 'https://azure.microsoft.com/pricing/details/functions/'
+        },
+        tags: ['serverless', 'functions', 'events', 'http'],
+        documentation: 'https://learn.microsoft.com/azure/azure-functions/',
+        availability: { public: true, gov: true }
+      },
+      {
         id: 'azure-kubernetes-service',
         name: 'Azure Kubernetes Service (AKS)',
         category: 'compute',
@@ -179,6 +201,28 @@ export const azureServiceCatalog: AzureServiceCatalog = {
         },
         tags: ['files', 'smb', 'nfs', 'lift-and-shift'],
         documentation: 'https://learn.microsoft.com/azure/storage/files/storage-files-introduction',
+        availability: { public: true, gov: true }
+      },
+      {
+        id: 'adls-gen2',
+        name: 'Azure Data Lake Storage Gen2',
+        category: 'object-storage',
+        tier: 'PaaS',
+        description: 'Hierarchical namespace storage for big data analytics',
+        longDescription: 'Combines the scalability and cost benefits of object storage with a high-performance file system for analytics.',
+        requiredDependencies: ['managed-identity'],
+        optionalDependencies: ['private-endpoints'],
+        conflictsWith: [],
+        nfrRequirements: ['data-growth', 'search-analytics'],
+        architectureRole: 'supporting',
+        pricing: {
+          tier: 'Standard',
+          estimate: '$0.0184/GB/month',
+          unit: 'per GB/month',
+          calculator: 'https://azure.microsoft.com/pricing/details/storage/data-lake/'
+        },
+        tags: ['data-lake', 'analytics', 'big-data'],
+        documentation: 'https://learn.microsoft.com/azure/storage/blobs/data-lake-storage-introduction',
         availability: { public: true, gov: true }
       }
     ]
@@ -334,6 +378,134 @@ export const azureServiceCatalog: AzureServiceCatalog = {
       }
     ]
   },
+  analytics: {
+    id: 'analytics',
+    name: 'Analytics & Warehousing',
+    description: 'Data engineering, analytics, and warehouses',
+    icon: '📈',
+    color: 'orange',
+    services: [
+      {
+        id: 'databricks',
+        name: 'Azure Databricks',
+        category: 'analytics',
+        tier: 'PaaS',
+        description: 'Unified data analytics platform with Spark',
+        longDescription: 'Collaborative Apache Spark-based analytics platform optimized for Azure.',
+        requiredDependencies: ['managed-identity'],
+        optionalDependencies: ['adls-gen2', 'blob-storage', 'private-endpoints'],
+        conflictsWith: [],
+        nfrRequirements: ['data-growth', 'search-analytics'],
+        architectureRole: 'optional',
+        pricing: {
+          tier: 'DBU-based',
+          estimate: '$ (usage-based)',
+          unit: 'per DBU-hour',
+          calculator: 'https://azure.microsoft.com/pricing/details/databricks/'
+        },
+        tags: ['spark', 'etl', 'ml', 'analytics'],
+        documentation: 'https://learn.microsoft.com/azure/databricks/',
+        availability: { public: true, gov: true }
+      },
+      {
+        id: 'synapse',
+        name: 'Azure Synapse Analytics',
+        category: 'analytics',
+        tier: 'PaaS',
+        description: 'Cloud analytics service that unifies big data and data warehousing',
+        longDescription: 'Bring together enterprise data warehousing and Big Data analytics.',
+        requiredDependencies: ['managed-identity'],
+        optionalDependencies: ['adls-gen2', 'blob-storage', 'private-endpoints'],
+        conflictsWith: [],
+        nfrRequirements: ['search-analytics'],
+        architectureRole: 'optional',
+        pricing: {
+          tier: 'DWU-based',
+          estimate: '$ (usage-based)',
+          unit: 'per DWU-hour',
+          calculator: 'https://azure.microsoft.com/pricing/details/synapse-analytics/'
+        },
+        tags: ['warehouse', 'sql', 'etl', 'analytics'],
+        documentation: 'https://learn.microsoft.com/azure/synapse-analytics/',
+        availability: { public: true, gov: true }
+      },
+      {
+        id: 'snowflake',
+        name: 'Snowflake',
+        category: 'analytics',
+        tier: 'SaaS',
+        description: 'External data warehouse (multi-cloud partner)',
+        longDescription: 'Snowflake Data Cloud—separate compute and storage with instant elasticity and secure data sharing.',
+        requiredDependencies: [],
+        optionalDependencies: ['adls-gen2', 'blob-storage'],
+        conflictsWith: [],
+        nfrRequirements: ['search-analytics'],
+        architectureRole: 'optional',
+        pricing: {
+          tier: 'Usage-based',
+          estimate: '$ (partner pricing)',
+          unit: 'varies',
+          calculator: 'https://www.snowflake.com/pricing/'
+        },
+        tags: ['external', 'warehouse', 'partner'],
+        documentation: 'https://www.snowflake.com/',
+        availability: { public: true, gov: false }
+      }
+    ]
+  },
+  integration: {
+    id: 'integration',
+    name: 'Integration & API',
+    description: 'Workflow automation and API gateways',
+    icon: '🧩',
+    color: 'cyan',
+    services: [
+      {
+        id: 'api-management',
+        name: 'Azure API Management',
+        category: 'integration',
+        tier: 'PaaS',
+        description: 'Secure, publish, and monitor APIs at scale',
+        longDescription: 'API gateway, developer portal, policies, and analytics for internal and external APIs.',
+        requiredDependencies: ['managed-identity'],
+        optionalDependencies: ['key-vault', 'private-endpoints', 'front-door'],
+        conflictsWith: [],
+        nfrRequirements: ['request-types'],
+        architectureRole: 'supporting',
+        pricing: {
+          tier: 'Developer',
+          estimate: '$48/month (dev tier)',
+          unit: 'per instance',
+          calculator: 'https://azure.microsoft.com/pricing/details/api-management/'
+        },
+        tags: ['apim', 'api-gateway', 'policies', 'portal'],
+        documentation: 'https://learn.microsoft.com/azure/api-management/',
+        availability: { public: true, gov: true }
+      },
+      {
+        id: 'logic-apps',
+        name: 'Azure Logic Apps',
+        category: 'integration',
+        tier: 'PaaS',
+        description: 'Low-code workflow automation and system integration',
+        longDescription: 'Automate and orchestrate tasks, business processes, and workflows.',
+        requiredDependencies: ['managed-identity'],
+        optionalDependencies: ['service-bus', 'event-hubs', 'key-vault'],
+        conflictsWith: [],
+        nfrRequirements: ['request-types'],
+        architectureRole: 'optional',
+        pricing: {
+          tier: 'Consumption',
+          estimate: '$0.000025/action',
+          unit: 'per action',
+          calculator: 'https://azure.microsoft.com/pricing/details/logic-apps/'
+        },
+        tags: ['workflow', 'integration', 'low-code'],
+        documentation: 'https://learn.microsoft.com/azure/logic-apps/',
+        availability: { public: true, gov: true }
+      }
+    ]
+  },
   networking: {
     id: 'networking',
     name: 'Networking Services',
@@ -437,6 +609,50 @@ export const azureServiceCatalog: AzureServiceCatalog = {
         availability: { public: true, gov: true }
       },
       {
+        id: 'event-hubs',
+        name: 'Azure Event Hubs',
+        category: 'messaging',
+        tier: 'PaaS',
+        description: 'Big data streaming platform and event ingestion service',
+        longDescription: 'Ingest millions of events per second from websites, apps, and devices.',
+        requiredDependencies: ['managed-identity'],
+        optionalDependencies: ['private-endpoints'],
+        conflictsWith: [],
+        nfrRequirements: ['request-types', 'expected-rps'],
+        architectureRole: 'supporting',
+        pricing: {
+          tier: 'Standard',
+          estimate: '$22/month + throughput units',
+          unit: 'per TU',
+          calculator: 'https://azure.microsoft.com/pricing/details/event-hubs/'
+        },
+        tags: ['streaming', 'events', 'iot', 'cdc'],
+        documentation: 'https://learn.microsoft.com/azure/event-hubs/',
+        availability: { public: true, gov: true }
+      },
+      {
+        id: 'confluent-kafka',
+        name: 'Confluent Cloud (Kafka)',
+        category: 'messaging',
+        tier: 'SaaS',
+        description: 'Fully managed Apache Kafka by Confluent (external partner)',
+        longDescription: 'Managed Kafka clusters, connectors, and stream processing with enterprise features.',
+        requiredDependencies: [],
+        optionalDependencies: [],
+        conflictsWith: [],
+        nfrRequirements: ['request-types'],
+        architectureRole: 'optional',
+        pricing: {
+          tier: 'Usage-based',
+          estimate: '$ (partner pricing)',
+          unit: 'varies',
+          calculator: 'https://www.confluent.io/confluent-cloud/'
+        },
+        tags: ['kafka', 'external', 'partner', 'streaming'],
+        documentation: 'https://www.confluent.io/',
+        availability: { public: true, gov: false }
+      },
+      {
         id: 'azure-cache-redis',
         name: 'Azure Cache for Redis',
         category: 'messaging',
@@ -538,6 +754,7 @@ export const generateRecommendations = (nfrAssessment: any) => {
   // Compute recommendations based on preferences
   if (nfrAssessment?.serverlessAcceptable === 'Yes, cold starts OK') {
     recommendations.push(getServiceById('azure-container-apps'))
+    recommendations.push(getServiceById('azure-functions'))
   } else if (nfrAssessment?.platformPreference === 'Container-based (AKS)') {
     recommendations.push(getServiceById('azure-kubernetes-service'))
   } else {
@@ -569,6 +786,32 @@ export const generateRecommendations = (nfrAssessment: any) => {
   // Caching for performance
   if (nfrAssessment?.readWriteRatio?.includes('80%') || nfrAssessment?.latencyTargets) {
     recommendations.push(getServiceById('azure-cache-redis'))
+  }
+
+  // Messaging & streaming
+  const reqTypes = String(nfrAssessment?.requestTypes || nfrAssessment?.request_types || nfrAssessment?.['request-types'] || '').toLowerCase()
+  const expectedRps = parseInt(String(nfrAssessment?.expectedRps || nfrAssessment?.expected_rps || ''), 10)
+  if (reqTypes.includes('async') || reqTypes.includes('queue') || reqTypes.includes('event')) {
+    recommendations.push(getServiceById('service-bus'))
+  }
+  if (reqTypes.includes('stream') || reqTypes.includes('kafka') || (!isNaN(expectedRps) && expectedRps > 5000)) {
+    recommendations.push(getServiceById('event-hubs'))
+  }
+
+  // Analytics & warehousing
+  const analyticsText = String(nfrAssessment?.searchAnalytics || nfrAssessment?.['search-analytics'] || '').toLowerCase()
+  const dataGrowth = nfrAssessment?.dataGrowth || nfrAssessment?.['data-growth']
+  if (analyticsText.includes('analytics') || analyticsText.includes('report')) {
+    recommendations.push(getServiceById('synapse'))
+    recommendations.push(getServiceById('databricks'))
+  }
+  if (dataGrowth) {
+    recommendations.push(getServiceById('adls-gen2'))
+  }
+
+  // API management
+  if (reqTypes.includes('api')) {
+    recommendations.push(getServiceById('api-management'))
   }
   
   return recommendations.filter(Boolean) as AzureService[]

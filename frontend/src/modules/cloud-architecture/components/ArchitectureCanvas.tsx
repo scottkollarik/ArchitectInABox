@@ -200,6 +200,8 @@ const ArchitectureCanvas: React.FC = () => {
       case 'compute': return 'Compute'
       case 'databases': return 'Databases'
       case 'object-storage': return 'Object & File Storage'
+      case 'analytics': return 'Analytics & Warehousing'
+      case 'integration': return 'Integration & API'
       case 'networking': return 'Networking'
       case 'security': return 'Security'
       case 'monitoring': return 'Monitoring'
