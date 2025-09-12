@@ -5,7 +5,8 @@ import {
   CodeBracketIcon, 
   DevicePhoneMobileIcon, 
   Cog6ToothIcon, 
-  CpuChipIcon 
+  CpuChipIcon,
+  CircleStackIcon
 } from '@heroicons/react/24/outline'
 import ProjectHeader from './ProjectHeader'
 
@@ -18,6 +19,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const navigationItems = [
     { path: '/cloud-architecture', name: 'Cloud Architecture', icon: CloudIcon },
+    { path: '/inventory', name: 'Inventory', icon: CircleStackIcon },
     { path: '/api-development', name: 'API Development', icon: CodeBracketIcon },
     { path: '/frontend-development', name: 'Frontend', icon: DevicePhoneMobileIcon },
     { path: '/system-integration', name: 'Integration', icon: Cog6ToothIcon },
@@ -32,6 +34,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const joinedRoutes = [
     '/cloud-architecture',
     '/',
+    '/inventory',
     '/api-development',
     '/frontend-development',
     '/system-integration',

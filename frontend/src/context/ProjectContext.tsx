@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import type { NFRSection, ProjectArchitectureState, ProjectCloudConfig, ProjectProfile } from '../modules/cloud-architecture/types'
+import type { NFRSection, ProjectArchitectureState, ProjectCloudConfig, ProjectProfile, ProjectConstraints } from '../modules/cloud-architecture/types'
 
 // Simple project management without multi-cloud complexity
 export interface Project {
@@ -12,6 +12,7 @@ export interface Project {
   architecture?: ProjectArchitectureState
   cloud?: ProjectCloudConfig
   profile?: ProjectProfile
+  constraints?: ProjectConstraints
 }
 
 interface ProjectContextType {

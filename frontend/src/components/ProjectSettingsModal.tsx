@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { useProject } from '../context/ProjectContext'
 import AzureRegionSelector from '../modules/cloud-architecture/components/inputs/AzureRegionSelector'
+import BlueprintImportButton from '../modules/cloud-architecture/components/BlueprintImportButton'
 
 const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const { currentProject, updateProject } = useProject()
   const [cloudFamily, setCloudFamily] = useState<'public' | 'gov'>('public')
   const [regionSelection, setRegionSelection] = useState<any>({})
+  const [residencyPolicy, setResidencyPolicy] = useState<'no-restriction'|'in-country'|'in-geo'|'custom'>('no-restriction')
+  const [residencyCountries, setResidencyCountries] = useState<string[]>([])
   const [profile, setProfile] = useState({ level: 'starter', size: 'M', criticality: 'dev/test' })
   const [projectName, setProjectName] = useState('')
   const [projectDescription, setProjectDescription] = useState('')
@@ -23,6 +26,8 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
     rs.drStrategy = currentProject.cloud?.secondaryRegionId ? 'manual' : 'none'
     rs.secondary = currentProject.cloud?.secondaryRegionId
     setRegionSelection(rs)
+    setResidencyPolicy((currentProject.cloud?.policies?.residency as any) || 'no-restriction')
+    setResidencyCountries(currentProject.cloud?.policies?.countries || [])
   }, [currentProject])
 
   if (!open) return null
@@ -36,6 +41,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
         cloudFamily,
         primaryRegionId: regionSelection?.primary,
         secondaryRegionId: regionSelection?.drStrategy === 'paired' ? regionSelection?.pairedSuggestion : regionSelection?.secondary,
+        policies: { residency: residencyPolicy, countries: residencyCountries }
       },
       profile: profile as any,
     })
@@ -91,6 +97,62 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                 <label className="block text-sm font-medium text-architect-gray-700 mb-1">Regions & DR</label>
                 <AzureRegionSelector id="project-region" value={regionSelection} onChange={setRegionSelection} />
               </div>
+            </div>
+            <div className="mt-3 grid md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-architect-gray-700 mb-1">Residency Policy</label>
+                <select
+                  value={residencyPolicy}
+                  onChange={(e)=>setResidencyPolicy(e.target.value as any)}
+                  className="w-full px-3 py-2 border border-architect-gray-300 rounded"
+                >
+                  <option value="no-restriction">No restriction</option>
+                  <option value="in-country">In country</option>
+                  <option value="in-geo">In geography (e.g., EU-only)</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-architect-gray-700 mb-1">Countries (ISO)</label>
+                <input
+                  type="text"
+                  value={residencyCountries.join(', ')}
+                  onChange={(e)=>setResidencyCountries(e.target.value.split(',').map(s=>s.trim()).filter(Boolean))}
+                  className="w-full px-3 py-2 border border-architect-gray-300 rounded"
+                  placeholder="e.g., US, CA, DE"
+                  disabled={residencyPolicy === 'no-restriction' || residencyPolicy === 'in-geo'}
+                />
+              </div>
+            </div>
+            {/* Blueprint / Constraints */}
+            <div className="mt-4 p-3 border border-architect-gray-200 rounded bg-architect-gray-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-architect-gray-900">Blueprint (Constraints)</div>
+                  <div className="text-xs text-architect-gray-600">Import allow/deny lists to guide planning across this project.</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <BlueprintImportButton onImport={async (payload) => { await updateProject({ constraints: payload }) }} />
+                  {currentProject?.constraints && (
+                    <button
+                      onClick={() => updateProject({ constraints: undefined })}
+                      className="text-xs px-2 py-1 rounded border border-architect-gray-300 text-architect-gray-700 hover:bg-white"
+                      title="Remove constraints"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+              {currentProject?.constraints && (
+                <div className="mt-2 text-xs text-architect-gray-700">
+                  <div><span className="text-architect-gray-500">Allowed:</span> {currentProject.constraints.allowServiceIds?.length ?? 0}</div>
+                  <div><span className="text-architect-gray-500">Denied:</span> {currentProject.constraints.denyServiceIds?.length ?? 0}</div>
+                  {currentProject.constraints.notes && (
+                    <div className="mt-1"><span className="text-architect-gray-500">Notes:</span> {currentProject.constraints.notes}</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

@@ -2,7 +2,7 @@
 export interface NFRQuestion {
   id: string
   text: string
-  inputType: 'text' | 'select' | 'number' | 'checkbox' | 'multiselect' | 'compound' | 'card-list' | 'numeric-with-units' | 'conditional-fieldset' | 'azure-region' | 'percentage-split' | 'latency-targets' | 'size-range'
+  inputType: 'text' | 'select' | 'number' | 'checkbox' | 'multiselect' | 'compound' | 'card-list' | 'numeric-with-units' | 'conditional-fieldset' | 'azure-region' | 'percentage-split' | 'latency-targets' | 'size-range' | 'textarea'
   isRequired: boolean
   isOptional: boolean
   isCompleted: boolean
@@ -129,6 +129,13 @@ export interface ProjectArchitectureState {
   items: ArchitectureItemPersisted[]
   lastSaved: string
   overrides?: Record<string, ArchitectureServiceOverride>
+}
+
+// Simple project-level constraints (Phase 1)
+export interface ProjectConstraints {
+  allowServiceIds?: string[]
+  denyServiceIds?: string[]
+  notes?: string
 }
 
 export type SizingLevel = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'Custom'

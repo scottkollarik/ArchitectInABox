@@ -1,8 +1,10 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useDrag } from 'react-dnd'
 import { 
   ChevronDownIcon, 
   ChevronRightIcon,
+  ChevronDoubleDownIcon,
+  ChevronDoubleUpIcon,
   MagnifyingGlassIcon,
   TagIcon,
   CurrencyDollarIcon,
@@ -18,6 +20,7 @@ const AzureServicesBrowser: React.FC = () => {
   )
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTier, setSelectedTier] = useState<string>('all')
+  const [idFilter, setIdFilter] = useState<Set<string> | null>(null)
   const { currentProject, updateProject } = useProject()
 
   const toggleCategory = (categoryId: string) => {
@@ -30,9 +33,14 @@ const AzureServicesBrowser: React.FC = () => {
     setExpandedCategories(newExpanded)
   }
 
-  // Filter services based on search and tier
+  // Filter services based on search, tier, idFilter
   const filterServices = (services: AzureService[]) => {
     return services.filter(service => {
+      // Constraints (Phase 1): if allow list exists, only allow those; always remove denies
+      const cons = currentProject?.constraints
+      if (cons?.denyServiceIds && cons.denyServiceIds.includes(service.id)) return false
+      if (cons?.allowServiceIds && cons.allowServiceIds.length > 0 && !cons.allowServiceIds.includes(service.id)) return false
+      const matchesIds = !idFilter || idFilter.has(service.id)
       const matchesSearch = searchTerm === '' || 
         service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         service.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -42,12 +50,37 @@ const AzureServicesBrowser: React.FC = () => {
       const fam = currentProject?.cloud?.cloudFamily || 'public'
       const available = service.availability ? (service.availability as any)[fam] !== false : true
 
-      return matchesSearch && matchesTier && available
+      return matchesIds && matchesSearch && matchesTier && available
     })
   }
 
+  // Listen for external filter request to show only recommended missing services
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { ids?: string[] }
+      const ids = (detail?.ids || []).filter(Boolean)
+      if (ids.length === 0) {
+        setIdFilter(null)
+        return
+      }
+      const set = new Set(ids)
+      setIdFilter(set)
+      setSearchTerm('')
+      // Expand categories containing matches
+      const toExpand = new Set<string>()
+      Object.entries(azureServiceCatalog).forEach(([catId, cat]) => {
+        if (cat.services.some(s => set.has(s.id))) toExpand.add(catId)
+      })
+      setExpandedCategories(toExpand)
+      // Optional: scroll to top of the browser
+      try { document.getElementById('azure-services-browser-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch {}
+    }
+    window.addEventListener('services-filter-missing', handler as EventListener)
+    return () => window.removeEventListener('services-filter-missing', handler as EventListener)
+  }, [currentProject?.cloud?.cloudFamily])
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" id="azure-services-browser-top">
       {/* Search and Filter Controls */}
       <div className="space-y-3">
         <div className="relative">
@@ -61,7 +94,7 @@ const AzureServicesBrowser: React.FC = () => {
           />
         </div>
         
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3">
           <select
             className="select-field text-sm"
             value={selectedTier}
@@ -72,21 +105,34 @@ const AzureServicesBrowser: React.FC = () => {
             <option value="PaaS">PaaS Only</option>
             <option value="SaaS">SaaS Only</option>
           </select>
-          
+          {/* When idFilter is active, show a small clear button */}
+          {idFilter && (
+            <button
+              onClick={() => setIdFilter(null)}
+              className="text-sm text-architect-gray-600 hover:text-architect-gray-800"
+              title="Show all services"
+            >
+              Clear filter
+            </button>
+          )}
           <button
             onClick={() => {
               setExpandedCategories(new Set(Object.keys(azureServiceCatalog)))
             }}
-            className="text-sm text-azure-blue-600 hover:text-azure-blue-800"
+            className="p-1.5 rounded border border-architect-gray-300 text-architect-gray-700 hover:bg-architect-gray-50"
+            title="Expand all"
+            aria-label="Expand all"
           >
-            Expand All
+            <ChevronDoubleDownIcon className="w-4 h-4" />
           </button>
           
           <button
             onClick={() => setExpandedCategories(new Set())}
-            className="text-sm text-architect-gray-600 hover:text-architect-gray-800"
+            className="p-1.5 rounded border border-architect-gray-300 text-architect-gray-700 hover:bg-architect-gray-50"
+            title="Collapse all"
+            aria-label="Collapse all"
           >
-            Collapse All
+            <ChevronDoubleUpIcon className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -180,10 +226,10 @@ const DraggableServiceCard: React.FC<{ service: AzureService; size?: SizingLevel
     }),
   })
   // Attach drag to bar, preview to whole card so the card moves during drag
-  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-  barRef.current && drag(barRef)
-  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-  cardRef.current && preview(cardRef)
+  useEffect(() => {
+    if (barRef.current) drag(barRef)
+    if (cardRef.current) preview(cardRef)
+  }, [drag, preview])
 
   const getTierBadgeClass = (tier: string) => {
     switch (tier) {

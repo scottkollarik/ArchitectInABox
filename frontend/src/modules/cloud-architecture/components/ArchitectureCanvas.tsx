@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { useDrop } from 'react-dnd'
-import { CurrencyDollarIcon } from '@heroicons/react/24/outline'
+// icons managed in outer header; none used here
 import type { AzureService, SelectedService, ProjectArchitectureState } from '../types'
-import { getServiceById, azureServiceCatalog, generateRecommendations } from '../data/azureServices'
+import { getServiceById, azureServiceCatalog } from '../data/azureServices'
 import { useProject } from '../../../context/ProjectContext'
 // ArchitectureSection no longer used in list view
 import ServiceCard from './architecture/ServiceCard'
@@ -17,7 +17,9 @@ const ArchitectureCanvas: React.FC = () => {
 
   const addNotification = (message: string, type: 'info' | 'warning' | 'success' = 'info') => {
     const id = Date.now().toString()
-    setNotifications(prev => [...prev, { id, message, type }])
+    const payload = { id, message, type } as const
+    setNotifications(prev => [...prev, payload])
+    try { window.dispatchEvent(new CustomEvent('arch-message', { detail: payload })) } catch {}
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id))
     }, 5000)
@@ -208,105 +210,35 @@ const ArchitectureCanvas: React.FC = () => {
   }
 
   // (Rack view manifest meta derivation removed)
-  function summarizeNfr(sections?: import('../types').NFRSection[]) {
-    if (!sections) return {}
-    const find = (id: string) => {
-      for (const s of sections) {
-        const q = s.questions.find(q => q.id === id)
-        if (q) return (q as any).value
-      }
-      return undefined
-    }
-    let dataModel: string | undefined
-    const models = find('data-models') as any[] | undefined
-    if (Array.isArray(models) && models[0] && models[0]['model-type']) {
-      dataModel = String(models[0]['model-type']).includes('Relational') ? 'Relational' :
-                  String(models[0]['model-type']).includes('Document') ? 'Document' : undefined
-    }
-    return {
-      serverlessAcceptable: find('serverless-acceptable'),
-      platformPreference: find('platform-preference'),
-      dataModel,
-      readWriteRatio: find('read-write-ratio'),
-      latencyTargets: find('latency-targets'),
-      networkPosture: find('network-posture')
-    } as any
-  }
 
-  // Update quick stats in the parent component
+  // Listen for external clear command from page header
   useEffect(() => {
-    const servicesCountEl = document.getElementById('services-count')
-    const estimatedCostEl = document.getElementById('estimated-cost')
-    
-    if (servicesCountEl) {
-      servicesCountEl.textContent = selectedServices.length.toString()
-    }
-    
-    if (estimatedCostEl) {
-      const cost = calculateEstimatedCost()
-      estimatedCostEl.textContent = cost > 0 ? `$${cost.toFixed(0)}/month` : '$0'
-    }
-  }, [selectedServices])
+    const handler = () => clearArchitecture()
+    window.addEventListener('arch-clear', handler)
+    return () => window.removeEventListener('arch-clear', handler)
+  }, [])
 
-  // Alignment meter: compare NFR-driven recommendations to selected services
-  const alignment = useMemo(() => {
-    try {
-      const sections = (currentProject as any)?.nfrAssessment as import('../types').NFRSection[] | undefined
-      const nfr = summarizeNfr(sections)
-      const recs = generateRecommendations(nfr) || []
-      const selectedIds = new Set(selectedServices.map(s => s.id))
-      const matched = recs.filter(s => s && selectedIds.has(s.id))
-      const missing = recs.filter(s => s && !selectedIds.has(s.id))
-      const pct = recs.length ? Math.round((matched.length / recs.length) * 100) : 100
-      return { matched, missing, pct }
-    } catch {
-      return { matched: [], missing: [], pct: 100 }
+  // Listen for external add-service command from page suggestions
+  useEffect(() => {
+    const handler = (e: Event) => {
+      try {
+        const id = (e as CustomEvent).detail?.id as string | undefined
+        if (!id) return
+        const svc = getServiceById(id)
+        if (svc) handleServiceDrop(svc)
+      } catch {}
     }
-  }, [currentProject, selectedServices])
+    window.addEventListener('arch-add-service', handler as EventListener)
+    return () => window.removeEventListener('arch-add-service', handler as EventListener)
+  }, [handleServiceDrop])
+
+  // Alignment and suggestions are shown in the outer header
 
   return (
     <div className="space-y-4">
-      {/* Notifications */}
-      {notifications.length > 0 && (
-        <div className="space-y-2">
-          {notifications.map(notification => (
-            <div 
-              key={notification.id}
-              className={`text-xs p-2 rounded animate-fade-in ${
-                notification.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' :
-                notification.type === 'warning' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
-                'bg-blue-50 text-blue-700 border border-blue-200'
-              }`}
-            >
-              {notification.message}
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Drop Zone (container wraps category lanes) */}
       <div ref={rootDrop} className={`drop-zone min-h-48 p-4 rounded-lg transition-all duration-200 ${isOverRoot ? 'border-azure-blue-500 bg-azure-blue-50' : 'border-architect-gray-300 bg-white'} border`}>
-        {/* Architecture Actions */}
-        <div className="flex items-center justify-between pb-3 border-b border-architect-gray-200">
-          <h3 className="font-semibold text-architect-gray-900">
-            Architecture ({selectedServices.length} services)
-          </h3>
-          <div className="flex items-center gap-2">
-            {/* Alignment meter */}
-            <div className="hidden md:flex items-center gap-1 text-xs px-2 py-1 rounded border border-architect-gray-300">
-              <span className={`font-semibold ${alignment.pct === 100 ? 'text-green-700' : alignment.pct >= 60 ? 'text-amber-700' : 'text-red-700'}`}>{alignment.pct}%</span>
-              <span className="text-architect-gray-600">alignment</span>
-            </div>
-            <button
-              onClick={clearArchitecture}
-              className="text-xs text-red-600 hover:text-red-800 font-medium"
-            >
-              Clear All
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-4 mt-3">
+        <div className="space-y-4">
           {Object.keys(azureServiceCatalog).map((catKey) => {
             const list = servicesByCategory[catKey] || []
             return (
@@ -324,32 +256,6 @@ const ArchitectureCanvas: React.FC = () => {
           {selectedServices.length === 0 && (
             <div className="text-center text-xs text-architect-gray-500">Drag a service by its top bar and drop into a matching section.</div>
           )}
-          {/* Missing recommendations (quick nudge) */}
-          {alignment.missing.length > 0 && (
-            <div className="text-xs text-architect-gray-700 bg-architect-gray-50 border border-architect-gray-200 rounded p-2">
-              <span className="font-medium">Suggestions: </span>
-              {alignment.missing.slice(0,4).map((s) => (
-                <span key={s.id} className="inline-block px-2 py-0.5 border border-azure-blue-300 text-azure-blue-700 rounded-full mr-1 mt-1">{s.name}</span>
-              ))}
-              {alignment.missing.length > 4 && <span className="text-architect-gray-500"> +{alignment.missing.length - 4} more</span>}
-            </div>
-          )}
-        </div>
-
-        {/* Cost Summary */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-4">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center space-x-2">
-              <CurrencyDollarIcon className="w-4 h-4 text-green-600" />
-              <span className="font-medium text-green-800">Estimated Monthly Cost</span>
-            </div>
-            <span className="font-bold text-green-800">
-              ${calculateEstimatedCost().toFixed(0)}
-            </span>
-          </div>
-          <p className="text-xs text-green-700 mt-1">
-            *Rough estimate based on basic tiers. Use Azure calculator for precise pricing.
-          </p>
         </div>
       </div>
       <DetailsDrawer service={detailsService} onClose={() => setDetailsService(null)} />

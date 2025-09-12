@@ -4,6 +4,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend'
 import { ProjectProvider } from './context/ProjectContext'
 import Layout from './components/Layout'
 import CloudArchitecturePage from './modules/cloud-architecture/pages/CloudArchitecturePage'
+import InventoryPage from './modules/inventory/pages/InventoryPage'
 import APIDevelopmentPage from './modules/api-development/pages/APIDevelopmentPage'
 import FrontendDevelopmentPage from './modules/frontend-development/pages/FrontendDevelopmentPage'
 import SystemIntegrationPage from './modules/system-integration/pages/SystemIntegrationPage'
@@ -18,6 +19,7 @@ function App() {
             <Routes>
               <Route path="/" element={<CloudArchitecturePage />} />
               <Route path="/cloud-architecture" element={<CloudArchitecturePage />} />
+              <Route path="/inventory" element={<InventoryPage />} />
               {/* Future routes */}
               <Route path="/api-development" element={<APIDevelopmentPage />} />
               <Route path="/frontend-development" element={<FrontendDevelopmentPage />} />

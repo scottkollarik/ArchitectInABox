@@ -15,6 +15,8 @@ import PercentageSplit from './inputs/PercentageSplit'
 import LatencyTargets from './inputs/LatencyTargets'
 import ConditionalFieldSet from './inputs/ConditionalFieldSet'
 import AzureRegionSelector from './inputs/AzureRegionSelector'
+import SizeRange, { type SizeRangeValue } from './inputs/SizeRange'
+import AvgPeakRps from './inputs/AvgPeakRps'
 
 const NFRAssessmentForm: React.FC = () => {
   const { currentProject, updateProject } = useProject()
@@ -70,6 +72,31 @@ const NFRAssessmentForm: React.FC = () => {
     return () => window.removeEventListener('nfr-open-section', handler as EventListener)
   }, [])
 
+  // Demo seed: populate 3 example data sources once per session if none exist yet
+  useEffect(() => {
+    try {
+      if (!sections || sections.length === 0) return
+      const key = 'nfr-demo-seed-datasources'
+      if (sessionStorage.getItem(key)) return
+      const ds = sections.find(s => s.id === 'data-consistency')
+      if (!ds) return
+      const q = ds.questions.find(q => q.id === 'data-models')
+      if (!q) return
+      const cards = Array.isArray(q.value) ? q.value : []
+      if (cards.length > 0) { sessionStorage.setItem(key, '1'); return }
+      const demo = [
+        { name: 'User profiles', 'model-type': 'Relational (SQL)', consistency: 'Strong (ACID)', 'size-estimate': '100 GB' },
+        { name: 'Activity events', 'model-type': 'Document (NoSQL)', consistency: 'Session', 'size-estimate': '2 TB' },
+        { name: 'Media objects', 'model-type': 'Blob/File storage', consistency: 'Eventual', 'size-estimate': '10 TB' },
+      ]
+      setSections(prev => prev.map(section => section.id !== 'data-consistency' ? section : ({
+        ...section,
+        questions: section.questions.map(qq => qq.id !== 'data-models' ? qq : ({ ...qq, value: demo, isCompleted: true }))
+      })))
+      sessionStorage.setItem(key, '1')
+    } catch {}
+  }, [sections])
+
   const toggleSection = useCallback((sectionId: string) => {
     setSections(prev => prev.map(section => 
       section.id === sectionId 
@@ -114,6 +141,15 @@ const NFRAssessmentForm: React.FC = () => {
         : section
     ))
   }, [])
+
+  // Helpers for big number text fields (e.g., Avg/Peak RPS)
+  const decommify = (s: string) => s.replace(/,/g, '')
+  const commify = (s: string) => {
+    const raw = decommify(s)
+    if (!raw) return ''
+    const n = parseInt(raw, 10)
+    return isNaN(n) ? s : n.toLocaleString('en-US')
+  }
 
   const checkCompoundCompletion = useCallback((question: NFRQuestion, value: any) => {
     if (!question.compoundFields) return false
@@ -193,6 +229,30 @@ const NFRAssessmentForm: React.FC = () => {
     const inputId = `${sectionId}-${question.id}`
 
     switch (question.inputType) {
+      case 'size-range': {
+        const v = (question.value || {}) as any
+        const norm: SizeRangeValue = {
+          min: typeof v.min === 'number' ? v.min : '',
+          max: typeof v.max === 'number' ? v.max : '',
+          unit: (v.unit || 'KB') as any,
+        }
+        return (
+          <div className="mt-1">
+            <SizeRange id={inputId} value={norm} onChange={(val)=>updateQuestion(sectionId, question.id, val)} />
+          </div>
+        )
+      }
+      case 'textarea':
+        return (
+          <textarea
+            id={inputId}
+            value={question.value || ''}
+            onChange={(e) => updateQuestion(sectionId, question.id, e.target.value)}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+            rows={3}
+            placeholder={question.placeholder}
+          />
+        )
       case 'percentage-split':
         return (
           <PercentageSplit
@@ -242,7 +302,7 @@ const NFRAssessmentForm: React.FC = () => {
             id={inputId}
             value={question.value || ''}
             onChange={(e) => updateQuestion(sectionId, question.id, e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+            className="mt-1 block px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm max-w-xs"
           >
             <option value="">Select an option...</option>
             {question.options?.map((option) => (
@@ -277,20 +337,86 @@ const NFRAssessmentForm: React.FC = () => {
         )
 
       case 'compound':
+        // Compact layout with validation for Avg/Peak RPS
+        if (question.id === 'peak-vs-average') {
+          const onFieldChange = (fid: 'average-rps'|'peak-rps', v: string) => updateCompoundField(sectionId, question.id, fid, v)
+          return (
+            <AvgPeakRps id={inputId} value={question.value} onChange={onFieldChange} className="mt-1" />
+          )
+        }
+        // Special compact layout for data growth + retention: single line, tighter controls
+        if (question.id === 'data-growth') {
+          const widthFor = (id: string) => (
+            id.includes('amount') ? 'w-24' : 'w-32'
+          )
+          return (
+            <div className="mt-1">
+              <div className="flex flex-wrap items-end gap-3">
+                {question.compoundFields?.map((field) => {
+                  const fieldValue = question.value?.[field.id] || ''
+                  const fieldInputId = `${inputId}-${field.id}`
+                  const w = widthFor(field.id)
+                  return (
+                    <div key={field.id} className={w}>
+                      <label htmlFor={fieldInputId} className="block text-[11px] font-medium text-gray-700 mb-0.5">
+                        {field.label}
+                      </label>
+                      {field.type === 'select' ? (
+                        <select
+                          id={fieldInputId}
+                          value={fieldValue}
+                          onChange={(e) => updateCompoundField(sectionId, question.id, field.id, e.target.value)}
+                          className="block w-full px-2 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm"
+                        >
+                          <option value="">Select...</option>
+                          {field.options?.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          id={fieldInputId}
+                          type={field.type}
+                          value={fieldValue}
+                          onChange={(e) => updateCompoundField(sectionId, question.id, field.id, e.target.value)}
+                          className="block w-full px-2 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm"
+                          placeholder={field.placeholder}
+                        />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        }
+        if (question.id === 'item-size') {
+          // Render as SizeRange instead of four separate fields
+          const v: any = question.value || {}
+          const norm: SizeRangeValue = {
+            min: typeof v['average-size'] === 'number' ? v['average-size'] : v.min ?? '',
+            max: typeof v['max-size'] === 'number' ? v['max-size'] : v.max ?? '',
+            unit: (v['max-unit'] || v['average-unit'] || v.unit || 'KB') as any,
+          }
+          return (
+            <div className="mt-1">
+              <SizeRange id={inputId} value={norm} onChange={(val)=>updateQuestion(sectionId, question.id, val)} />
+            </div>
+          )
+        }
+        // Default compound layout
         return (
           <div className="mt-1">
             <div className="grid grid-cols-2 gap-4">
               {question.compoundFields?.map((field) => {
                 const fieldValue = question.value?.[field.id] || ''
                 const fieldInputId = `${inputId}-${field.id}`
-                
                 return (
                   <div key={field.id}>
                     <label htmlFor={fieldInputId} className="block text-xs font-medium text-gray-700 mb-1">
                       {field.label}
                       {field.suffix && <span className="text-gray-500 ml-1">({field.suffix})</span>}
                     </label>
-                    
                     {field.type === 'select' ? (
                       <select
                         id={fieldInputId}
@@ -300,9 +426,7 @@ const NFRAssessmentForm: React.FC = () => {
                       >
                         <option value="">Select...</option>
                         {field.options?.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
+                          <option key={option} value={option}>{option}</option>
                         ))}
                       </select>
                     ) : (
@@ -502,11 +626,44 @@ const NFRAssessmentForm: React.FC = () => {
                   <ChevronDownIcon className="h-4 w-4 text-gray-400" />
                 )}
                 <div>
-                  <h3 className="font-medium text-gray-900">{section.title}</h3>
+                  <div className="flex items-center gap-2">
+                    {section.icon && <span className="text-base" aria-hidden>{section.icon}</span>}
+                    <h3 className="font-medium text-gray-900">{section.title}</h3>
+                    {(() => {
+                      const reqTotal = section.questions.filter(q => q.isRequired).length
+                      const reqDone = section.questions.filter(q => q.isRequired && q.isCompleted).length
+                      const optTotal = section.questions.filter(q => q.isOptional).length
+                      const optDone = section.questions.filter(q => q.isOptional && q.isCompleted).length
+                      return (
+                        <>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border border-architect-gray-300 text-architect-gray-700" title="Required questions completed">
+                            Req {reqDone}/{reqTotal}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border border-architect-gray-300 text-architect-gray-700" title="Optional questions answered">
+                            Opt {optDone}/{optTotal}
+                          </span>
+                        </>
+                      )
+                    })()}
+                  </div>
                   <p className="text-sm text-gray-500">{section.description}</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
+                {(() => {
+                  const pct = Math.round((completion.required.completed / (completion.required.total || 1)) * 100) || 0
+                  // Alternate mapping: 0 red, 1–33 red, 34–66 amber, 67–99 light‑green, 100 green
+                  const colorClasses = pct === 100
+                    ? 'bg-green-100 text-green-800 border-green-300'
+                    : pct >= 67
+                      ? 'bg-green-50 text-green-700 border-green-300'
+                      : pct >= 34
+                        ? 'bg-amber-50 text-amber-700 border-amber-300'
+                        : 'bg-red-50 text-red-700 border-red-300'
+                  return (
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${colorClasses}`}>{pct}%</span>
+                  )
+                })()}
                 {isCompleted ? (
                   <CheckCircleIcon className="h-5 w-5 text-green-500" />
                 ) : hasAnswers ? (
@@ -514,7 +671,6 @@ const NFRAssessmentForm: React.FC = () => {
                 ) : (
                   <InformationCircleIcon className="h-5 w-5 text-gray-400" />
                 )}
-                <span className="text-sm text-gray-500">{Math.round((completion.required.completed / completion.required.total) * 100) || 0}%</span>
               </div>
             </button>
 

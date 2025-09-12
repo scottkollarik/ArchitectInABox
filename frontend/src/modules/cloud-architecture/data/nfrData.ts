@@ -33,7 +33,7 @@ export const nfrSections: NFRSection[] = [
       {
         id: 'peak-vs-average',
         text: 'What are peak vs average RPS?',
-        inputType: 'latency-targets',
+        inputType: 'compound',
         isRequired: true,
         isOptional: false,
         isCompleted: false,
@@ -94,15 +94,14 @@ export const nfrSections: NFRSection[] = [
       // Region selection moved to Project Settings (Cloud > Regions & DR)
       {
         id: 'data-residency',
-        text: 'Any data residency needs?',
-        inputType: 'text',
+        text: 'Residency notes (optional)',
+        inputType: 'textarea',
         isRequired: false,
         isOptional: true,
         isCompleted: false,
-        // dependsOn removed: residency is governed by Project Settings policies
         architectureImpact: 'important',
-        placeholder: 'e.g., EU data must stay in EU',
-        helpText: 'Legal or compliance requirements for data location'
+        placeholder: 'Legal clarifications, exceptions, or notes',
+        helpText: 'Residency policy is configured in Project Settings; use this only for caveats.'
       },
       {
         id: 'request-types',
@@ -335,38 +334,13 @@ export const nfrSections: NFRSection[] = [
       {
         id: 'item-size',
         text: 'Typical item/document size ranges?',
-        inputType: 'compound',
+        inputType: 'size-range',
         isRequired: false,
         isOptional: true,
         isCompleted: false,
         architectureImpact: 'important',
         helpText: 'Affects storage and transfer optimization strategies',
-        compoundFields: [
-          {
-            id: 'average-size',
-            label: 'Average Size',
-            type: 'number',
-            placeholder: '2'
-          },
-          {
-            id: 'average-unit',
-            label: 'Unit',
-            type: 'select',
-            options: ['B', 'KB', 'MB', 'GB']
-          },
-          {
-            id: 'max-size',
-            label: 'Maximum Size',
-            type: 'number',
-            placeholder: '10'
-          },
-          {
-            id: 'max-unit',
-            label: 'Unit',
-            type: 'select',
-            options: ['B', 'KB', 'MB', 'GB']
-          }
-        ]
+        
       },
       
       {

@@ -1,76 +1,95 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
-export interface LatencyTargetsValue {
-  p95: { value: number | ''; unit: 'ms' | 'seconds' }
-  p99: { value: number | ''; unit: 'ms' | 'seconds' }
+export interface LatencyTargetsValueMs {
+  p95: number | '' // milliseconds
+  p99: number | '' // milliseconds
 }
 
 interface LatencyTargetsProps {
   id: string
-  value?: LatencyTargetsValue
-  onChange: (value: LatencyTargetsValue) => void
+  value?: any
+  onChange: (value: LatencyTargetsValueMs) => void
   className?: string
 }
 
 const LatencyTargets: React.FC<LatencyTargetsProps> = ({ id, value, onChange, className = '' }) => {
-  const normalize = (v: any): LatencyTargetsValue => {
+  const normalize = (v: any): LatencyTargetsValueMs => {
     if (v && typeof v === 'object') {
-      // New shape
+      // New shape with units
       if (v.p95 && v.p99) {
-        return {
-          p95: { value: v.p95.value ?? '', unit: (v.p95.unit as any) ?? 'ms' },
-          p99: { value: v.p99.value ?? '', unit: (v.p99.unit as any) ?? 'ms' },
-        }
+        const p95 = typeof v.p95 === 'number' ? v.p95 : (v.p95?.unit === 'seconds' ? (typeof v.p95?.value === 'number' ? v.p95.value * 1000 : '') : v.p95?.value ?? '')
+        const p99 = typeof v.p99 === 'number' ? v.p99 : (v.p99?.unit === 'seconds' ? (typeof v.p99?.value === 'number' ? v.p99.value * 1000 : '') : v.p99?.value ?? '')
+        return { p95: p95 as any, p99: p99 as any }
       }
-      // Legacy compound shape
-      const hasLegacy = 'p95-value' in v || 'p99-value' in v
-      if (hasLegacy) {
+      // Legacy compound fields
+      if ('p95-value' in v || 'p99-value' in v) {
+        const pv = v['p95-value']
+        const pu = v['p95-unit']
+        const qv = v['p99-value']
+        const qu = v['p99-unit']
         return {
-          p95: { value: v['p95-value'] ?? '', unit: (v['p95-unit'] as any) ?? 'ms' },
-          p99: { value: v['p99-value'] ?? '', unit: (v['p99-unit'] as any) ?? 'ms' },
-        }
+          p95: pu === 'seconds' ? (typeof pv === 'number' ? pv * 1000 : '') : (pv ?? ''),
+          p99: qu === 'seconds' ? (typeof qv === 'number' ? qv * 1000 : '') : (qv ?? ''),
+        } as any
       }
     }
-    return { p95: { value: '', unit: 'ms' }, p99: { value: '', unit: 'ms' } }
+    return { p95: '', p99: '' }
   }
 
-  const [internal, setInternal] = useState<LatencyTargetsValue>(normalize(value))
-
+  const [internal, setInternal] = useState<LatencyTargetsValueMs>(normalize(value))
+  const [p95Err, setP95Err] = useState<string>('')
+  const [p99Err, setP99Err] = useState<string>('')
+  const p95Ref = useRef<HTMLInputElement>(null)
+  const p99Ref = useRef<HTMLInputElement>(null)
   useEffect(() => { setInternal(normalize(value)) }, [value])
 
-  const update = (path: 'p95'|'p99', key: 'value'|'unit', val: any) => {
-    const next = { ...internal, [path]: { ...internal[path], [key]: val } } as LatencyTargetsValue
+  const update = (key: 'p95'|'p99', raw: string) => {
+    const n = raw === '' ? '' : parseInt(raw, 10)
+    const next = { ...internal, [key]: (isNaN(n as any) ? '' : (n as any)) } as LatencyTargetsValueMs
     setInternal(next)
     onChange(next)
   }
 
-  const toMs = (v?: {value: number|''; unit: 'ms'|'seconds'}) => !v || v.value === '' ? NaN : (v.unit === 'ms' ? (v.value as number) : (v.value as number) * 1000)
-  const p95ms = toMs(internal?.p95)
-  const p99ms = toMs(internal?.p99)
-  const invalidOrder = !isNaN(p95ms) && !isNaN(p99ms) && p95ms >= p99ms
+  const p95 = typeof internal.p95 === 'number' ? internal.p95 : NaN
+  const p99 = typeof internal.p99 === 'number' ? internal.p99 : NaN
+  const invalidOrder = !isNaN(p95) && !isNaN(p99) && p95 >= p99
+
+  const secHint = (ms: number | '') => {
+    if (typeof ms !== 'number' || isNaN(ms) || ms < 1000) return null
+    const s = (ms / 1000).toFixed(2)
+    return `≈ ${s} s`
+  }
+
+  const validateNumber = (key: 'p95'|'p99') => {
+    const val = key === 'p95' ? internal.p95 : internal.p99
+    const setErr = key === 'p95' ? setP95Err : setP99Err
+    const ref = key === 'p95' ? p95Ref : p99Ref
+    if (val === '' || typeof val === 'number') { setErr(''); return true }
+    setErr('Enter a valid number')
+    setTimeout(()=>ref.current?.focus(), 0)
+    return false
+  }
 
   return (
     <div className={`space-y-2 ${className}`}>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label htmlFor={`${id}-p95`} className="block text-xs font-medium text-gray-700 mb-1">P95 Latency</label>
-          <div className="flex gap-2">
-            <input id={`${id}-p95`} inputMode="numeric" pattern="[0-9]*" className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm" placeholder="200" value={internal.p95.value} onChange={(e)=>update('p95','value', e.target.value === '' ? '' : parseInt(e.target.value,10))}/>
-            <select className="px-3 py-2 border border-gray-300 rounded-md shadow-sm sm:text-sm" value={internal.p95.unit} onChange={(e)=>update('p95','unit', e.target.value)}>
-              <option value="ms">ms</option>
-              <option value="seconds">seconds</option>
-            </select>
+          <label htmlFor={`${id}-p95`} className="block text-xs font-medium text-gray-700 mb-1">P95 (ms)</label>
+          <div className="flex items-center gap-2">
+            <input id={`${id}-p95`} ref={p95Ref} inputMode="numeric" pattern="[0-9]*" className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm ${p95Err ? 'border-red-400' : 'border-gray-300'}`} placeholder="200" value={internal.p95}
+              onChange={(e)=>{ setP95Err(''); update('p95', e.target.value)}} onBlur={()=>validateNumber('p95')} />
+            <div className="text-[10px] text-gray-500 whitespace-nowrap">{secHint(internal.p95)}</div>
           </div>
+          {p95Err && <div className="text-[10px] text-red-600 mt-0.5">{p95Err}</div>}
         </div>
         <div>
-          <label htmlFor={`${id}-p99`} className="block text-xs font-medium text-gray-700 mb-1">P99 Latency</label>
-          <div className="flex gap-2">
-            <input id={`${id}-p99`} inputMode="numeric" pattern="[0-9]*" className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm" placeholder="500" value={internal.p99.value} onChange={(e)=>update('p99','value', e.target.value === '' ? '' : parseInt(e.target.value,10))}/>
-            <select className="px-3 py-2 border border-gray-300 rounded-md shadow-sm sm:text-sm" value={internal.p99.unit} onChange={(e)=>update('p99','unit', e.target.value)}>
-              <option value="ms">ms</option>
-              <option value="seconds">seconds</option>
-            </select>
+          <label htmlFor={`${id}-p99`} className="block text-xs font-medium text-gray-700 mb-1">P99 (ms)</label>
+          <div className="flex items-center gap-2">
+            <input id={`${id}-p99`} ref={p99Ref} inputMode="numeric" pattern="[0-9]*" className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm ${p99Err ? 'border-red-400' : 'border-gray-300'}`} placeholder="500" value={internal.p99}
+              onChange={(e)=>{ setP99Err(''); update('p99', e.target.value)}} onBlur={()=>validateNumber('p99')} />
+            <div className="text-[10px] text-gray-500 whitespace-nowrap">{secHint(internal.p99)}</div>
           </div>
+          {p99Err && <div className="text-[10px] text-red-600 mt-0.5">{p99Err}</div>}
         </div>
       </div>
       {invalidOrder && (

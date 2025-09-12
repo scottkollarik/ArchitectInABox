@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 
 export interface NumericWithUnitsValue {
   value: number | ''
@@ -40,6 +40,8 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
     value: value?.value || '',
     unit: value?.unit || defaultUnit || units[0]
   })
+  const [err, setErr] = useState<string>('')
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Update internal state when external value changes
   useEffect(() => {
@@ -89,6 +91,13 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
     inputMode: allowDecimals ? "decimal" : "numeric"
   } as const
 
+  const validateBlur = () => {
+    const val = internalValue.value
+    if (val === '' || typeof val === 'number') { setErr(''); return }
+    setErr('Enter a valid number')
+    setTimeout(()=>inputRef.current?.focus(), 0)
+  }
+
   return (
     <div className={`flex space-x-2 ${className}`}>
       <div className="flex-1">
@@ -101,14 +110,17 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
           id={id}
           {...inputProps}
           value={internalValue.value}
-          onChange={(e) => handleValueChange(e.target.value)}
-          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+          ref={inputRef}
+          onChange={(e) => { setErr(''); handleValueChange(e.target.value) }}
+          onBlur={validateBlur}
+          className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm ${err ? 'border-red-400' : 'border-gray-300'}`}
           placeholder={placeholder}
           disabled={disabled}
           min={min}
           max={max}
           step={step}
         />
+        {err && <div className="text-[10px] text-red-600 mt-0.5">{err}</div>}
       </div>
       
       <div className="flex-shrink-0" style={{ minWidth: '80px' }}>

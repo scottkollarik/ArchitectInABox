@@ -158,6 +158,28 @@ export const azureServiceCatalog: AzureServiceCatalog = {
         tags: ['object-storage', 'files', 'backup', 'archive'],
         documentation: 'https://docs.microsoft.com/azure/storage/blobs/',
         availability: { public: true, gov: true }
+      },
+      {
+        id: 'azure-files',
+        name: 'Azure Files',
+        category: 'object-storage',
+        tier: 'PaaS',
+        description: 'Managed SMB/NFS file shares for lift-and-shift and apps',
+        longDescription: 'Fully managed file shares in the cloud, accessible via SMB and NFS with AD integration and private endpoints.',
+        requiredDependencies: ['managed-identity'],
+        optionalDependencies: ['private-endpoints', 'cdn'],
+        conflictsWith: [],
+        nfrRequirements: ['data-growth', 'item-size'],
+        architectureRole: 'supporting',
+        pricing: {
+          tier: 'Standard',
+          estimate: '$0.06/GB/month',
+          unit: 'per GB/month',
+          calculator: 'https://azure.microsoft.com/en-us/pricing/calculator/'
+        },
+        tags: ['files', 'smb', 'nfs', 'lift-and-shift'],
+        documentation: 'https://learn.microsoft.com/azure/storage/files/storage-files-introduction',
+        availability: { public: true, gov: true }
       }
     ]
   },
