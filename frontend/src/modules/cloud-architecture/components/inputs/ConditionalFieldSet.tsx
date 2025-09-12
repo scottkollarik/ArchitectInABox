@@ -35,6 +35,7 @@ export interface ConditionalFieldSetProps {
   values: Record<string, any>
   onChange: (fieldId: string, value: any) => void
   className?: string
+  layout?: 'stack' | 'inline'
 }
 
 const ConditionalFieldSet: React.FC<ConditionalFieldSetProps> = ({
@@ -43,7 +44,8 @@ const ConditionalFieldSet: React.FC<ConditionalFieldSetProps> = ({
   rules,
   values,
   onChange,
-  className = ""
+  className = "",
+  layout = 'stack'
 }) => {
   const [fieldStates, setFieldStates] = useState<Record<string, ConditionalField>>(() => {
     return fields.reduce((acc, field) => {
@@ -109,24 +111,40 @@ const ConditionalFieldSet: React.FC<ConditionalFieldSetProps> = ({
 
     const fieldValue = values[field.id] || field.defaultValue || ''
     const fieldId = `${id}-${field.id}`
+    const inlineWrap = layout === 'inline'
+    const wrapClass = inlineWrap ? 'flex-0' : ''
+    const inputWidth = (desired: string) => inlineWrap ? desired : 'w-full'
+    const isNotes = (field.id === 'notes' || (field.label || '').toLowerCase().includes('notes'))
 
     switch (field.type) {
       case 'text':
         return (
-          <div key={field.id} className="space-y-1">
+          <div key={field.id} className={`space-y-1 ${inlineWrap && isNotes ? 'basis-full' : wrapClass} ${inputWidth(isNotes ? 'w-full' : 'w-44')}`}>
             <label htmlFor={fieldId} className="block text-xs font-medium text-gray-700">
               {field.label}
               {field.required && <span className="text-red-500 ml-1">*</span>}
             </label>
-            <input
-              id={fieldId}
-              type="text"
-              value={fieldValue}
-              onChange={(e) => handleFieldChange(field.id, e.target.value)}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
-              placeholder={field.placeholder}
-              disabled={fieldState?.disabled}
-            />
+            {isNotes ? (
+              <textarea
+                id={fieldId}
+                value={fieldValue}
+                onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+                placeholder={field.placeholder || 'Notes (optional)'}
+                disabled={fieldState?.disabled}
+                rows={3}
+              />
+            ) : (
+              <input
+                id={fieldId}
+                type="text"
+                value={fieldValue}
+                onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+                placeholder={field.placeholder}
+                disabled={fieldState?.disabled}
+              />
+            )}
             {field.helpText && (
               <p className="text-xs text-gray-500">{field.helpText}</p>
             )}
@@ -135,7 +153,7 @@ const ConditionalFieldSet: React.FC<ConditionalFieldSetProps> = ({
 
       case 'select':
         return (
-          <div key={field.id} className="space-y-1">
+          <div key={field.id} className={`space-y-1 ${wrapClass} ${inputWidth(layout === 'inline' ? 'w-auto' : 'w-44')}`}>
             <label htmlFor={fieldId} className="block text-xs font-medium text-gray-700">
               {field.label}
               {field.required && <span className="text-red-500 ml-1">*</span>}
@@ -144,7 +162,7 @@ const ConditionalFieldSet: React.FC<ConditionalFieldSetProps> = ({
               id={fieldId}
               value={fieldValue}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+              className={`${layout === 'inline' ? 'inline-block w-auto' : 'block w-full'} px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm`}
               disabled={fieldState?.disabled}
             >
               <option value="">Select...</option>
@@ -163,7 +181,7 @@ const ConditionalFieldSet: React.FC<ConditionalFieldSetProps> = ({
       case 'multiselect':
         const currentValues = Array.isArray(fieldValue) ? fieldValue : []
         return (
-          <div key={field.id} className="space-y-1">
+          <div key={field.id} className={`space-y-1 ${inlineWrap ? 'basis-full' : ''}`}>
             <label className="block text-xs font-medium text-gray-700">
               {field.label}
               {field.required && <span className="text-red-500 ml-1">*</span>}
@@ -194,8 +212,9 @@ const ConditionalFieldSet: React.FC<ConditionalFieldSetProps> = ({
         )
 
       case 'numeric-with-units':
+        const isDocSize = inlineWrap && field.id === 'document-size'
         return (
-          <div key={field.id} className="space-y-1">
+          <div key={field.id} className={`space-y-1 ${isDocSize ? 'basis-full' : wrapClass}`}>
             <NumericWithUnits
               id={fieldId}
               value={fieldValue}
@@ -208,6 +227,7 @@ const ConditionalFieldSet: React.FC<ConditionalFieldSetProps> = ({
               min={field.min}
               max={field.max}
               allowDecimals={field.allowDecimals}
+              className={inlineWrap ? (isDocSize ? 'w-full' : 'w-44') : ''}
             />
             {field.helpText && (
               <p className="text-xs text-gray-500">{field.helpText}</p>
@@ -218,6 +238,14 @@ const ConditionalFieldSet: React.FC<ConditionalFieldSetProps> = ({
       default:
         return null
     }
+  }
+
+  if (layout === 'inline') {
+    return (
+      <div className={`flex flex-wrap items-end gap-2 ${className}`}>
+        {fields.map(renderField)}
+      </div>
+    )
   }
 
   return (

@@ -31,10 +31,8 @@ const AvgPeakRps: React.FC<AvgPeakRpsProps> = ({ id, value, onChange, className 
     if (trimmed === '' || !isNumeric(raw)) {
       if (field === 'average-rps') {
         setAvgError('Enter a valid number')
-        setTimeout(() => avgRef.current?.focus(), 0)
       } else {
         setPeakError('Enter a valid number')
-        setTimeout(() => peakRef.current?.focus(), 0)
       }
       return false
     }
@@ -61,7 +59,6 @@ const AvgPeakRps: React.FC<AvgPeakRpsProps> = ({ id, value, onChange, className 
       const p = parseInt(pRaw, 10)
       if (a > p) {
         setPeakError('Peak RPS should be ≥ Average RPS')
-        setTimeout(() => peakRef.current?.focus(), 0)
         return false
       } else {
         setPeakError('')
@@ -72,7 +69,7 @@ const AvgPeakRps: React.FC<AvgPeakRpsProps> = ({ id, value, onChange, className 
 
   return (
     <div className={`mt-1 ${className}`}>
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-2">
         <div className="w-32">
           <label htmlFor={`${id}-average-rps`} className="block text-[11px] font-medium text-gray-700 mb-0.5">Average RPS</label>
           <input
@@ -117,4 +114,3 @@ const AvgPeakRps: React.FC<AvgPeakRpsProps> = ({ id, value, onChange, className 
 }
 
 export default AvgPeakRps
-

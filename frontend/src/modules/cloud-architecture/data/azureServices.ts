@@ -783,10 +783,16 @@ export const generateRecommendations = (nfrAssessment: any) => {
     recommendations.push(getServiceById('private-endpoints'))
   }
   
-  // Caching for performance
-  if (nfrAssessment?.readWriteRatio?.includes('80%') || nfrAssessment?.latencyTargets) {
-    recommendations.push(getServiceById('azure-cache-redis'))
-  }
+  // Caching for performance: heavy read or low-latency sensitivity
+  try {
+    const rwr = nfrAssessment?.readWriteRatio
+    const readPct = typeof rwr === 'object' ? Number(rwr.read) || 0 : 0
+    const heavyRead = readPct >= 80
+    const lowLatencySensitive = !!nfrAssessment?.latencyTargets
+    if (heavyRead || lowLatencySensitive) {
+      recommendations.push(getServiceById('azure-cache-redis'))
+    }
+  } catch {}
 
   // Messaging & streaming
   const reqTypes = String(nfrAssessment?.requestTypes || nfrAssessment?.request_types || nfrAssessment?.['request-types'] || '').toLowerCase()
@@ -799,13 +805,20 @@ export const generateRecommendations = (nfrAssessment: any) => {
   }
 
   // Analytics & warehousing
-  const analyticsText = String(nfrAssessment?.searchAnalytics || nfrAssessment?.['search-analytics'] || '').toLowerCase()
+  const sa = nfrAssessment?.searchAnalytics || nfrAssessment?.['search-analytics']
+  const useCases: string[] = Array.isArray(sa?.['use-cases']) ? sa['use-cases'] : []
+  const freshness: string | undefined = sa?.freshness
   const dataGrowth = nfrAssessment?.dataGrowth || nfrAssessment?.['data-growth']
-  if (analyticsText.includes('analytics') || analyticsText.includes('report')) {
+  if (useCases.includes('BI dashboards') || useCases.includes('Ad-hoc SQL') || useCases.includes('Operational reporting')) {
     recommendations.push(getServiceById('synapse'))
+  }
+  if (useCases.includes('Batch ETL') || useCases.includes('ML feature store/training')) {
     recommendations.push(getServiceById('databricks'))
   }
-  if (dataGrowth) {
+  if (useCases.includes('Real-time streaming') || freshness === 'Real-time (<1 min)' || freshness === 'Near-real-time (1–15 min)') {
+    recommendations.push(getServiceById('event-hubs'))
+  }
+  if (dataGrowth || useCases.length > 0) {
     recommendations.push(getServiceById('adls-gen2'))
   }
 

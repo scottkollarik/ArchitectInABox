@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { 
   ChevronDownIcon, 
   ChevronRightIcon, 
@@ -18,11 +18,41 @@ import AzureRegionSelector from './inputs/AzureRegionSelector'
 import SizeRange, { type SizeRangeValue } from './inputs/SizeRange'
 import AvgPeakRps from './inputs/AvgPeakRps'
 
+// Compute the best target id for the section/question label to reference
+const getQuestionLabelTargetId = (sectionId: string, question: NFRQuestion): string | undefined => {
+  const base = `${sectionId}-${question.id}`
+  switch (question.inputType) {
+    case 'text':
+    case 'number':
+    case 'select':
+    case 'textarea':
+    case 'azure-region':
+      return base
+    case 'percentage-split':
+      return `${base}-read`
+    case 'latency-targets':
+      return `${base}-p95`
+    case 'size-range':
+      return `${base}-min`
+    case 'compound':
+      if (question.id === 'peak-vs-average') return `${base}-average-rps`
+      if (question.id === 'data-growth') return `${base}-growth-amount`
+      if (question.compoundFields && question.compoundFields[0]) return `${base}-${question.compoundFields[0].id}`
+      return undefined
+    case 'card-list':
+    case 'multiselect':
+    case 'conditional-fieldset':
+    default:
+      return undefined
+  }
+}
+
 const NFRAssessmentForm: React.FC = () => {
   const { currentProject, updateProject } = useProject()
   const [sections, setSections] = useState<NFRSection[]>(nfrSections)
 
   // Merge saved NFR with current schema so new input types render while preserving values
+  const initializedRef = useRef<string | null>(null)
   useEffect(() => {
     const merge = (saved: NFRSection[] | undefined, defs: NFRSection[]): NFRSection[] => {
       if (!saved || saved.length === 0) return defs
@@ -33,16 +63,29 @@ const NFRAssessmentForm: React.FC = () => {
         const qById = new Map((s.questions || []).map(q => [q.id, q]))
         const mergedQs = def.questions.map(dq => {
           const sq = qById.get(dq.id) as any
-          // Only reuse saved value if input types match to avoid shape crashes
-          const useValue = sq && sq.inputType === dq.inputType ? sq.value : dq.value
+          let useValue = dq.value
+          if (sq) {
+            if (sq.inputType === dq.inputType) {
+              useValue = sq.value
+            } else {
+              // Migrate legacy text answers into notes for new fieldsets
+              if ((dq.id === 'transactions' || dq.id === 'search-analytics') && typeof sq.value === 'string' && dq.inputType === 'conditional-fieldset') {
+                useValue = { ...(dq.value || {}), notes: sq.value }
+              }
+            }
+          }
           const isCompleted = typeof sq?.isCompleted === 'boolean' ? sq.isCompleted : dq.isCompleted
           return { ...dq, value: useValue, isCompleted }
         })
         return { ...def, isCollapsed: s.isCollapsed ?? def.isCollapsed, questions: mergedQs }
       })
     }
-    setSections(merge(currentProject?.nfrAssessment as NFRSection[] | undefined, nfrSections))
-  }, [currentProject])
+    const projId = currentProject?.id || 'none'
+    if (initializedRef.current === projId) return
+    const next = merge(currentProject?.nfrAssessment as NFRSection[] | undefined, nfrSections)
+    setSections(next)
+    initializedRef.current = projId
+  }, [currentProject?.id])
 
   // Save NFR data to project when sections change (debounced to prevent rapid saves)
   useEffect(() => {
@@ -257,9 +300,10 @@ const NFRAssessmentForm: React.FC = () => {
         return (
           <PercentageSplit
             id={inputId}
-            value={question.value}
+            value={question.value || { read: 50, write: 50 }}
             onChange={(val) => updateQuestion(sectionId, question.id, val)}
             className="mt-1"
+            mode={question.id === 'read-write-ratio' ? 'slider' : 'inputs'}
           />
         )
 
@@ -351,7 +395,7 @@ const NFRAssessmentForm: React.FC = () => {
           )
           return (
             <div className="mt-1">
-              <div className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-wrap items-end gap-2">
                 {question.compoundFields?.map((field) => {
                   const fieldValue = question.value?.[field.id] || ''
                   const fieldInputId = `${inputId}-${field.id}`
@@ -399,7 +443,7 @@ const NFRAssessmentForm: React.FC = () => {
             unit: (v['max-unit'] || v['average-unit'] || v.unit || 'KB') as any,
           }
           return (
-            <div className="mt-1">
+            <div className="mt-0.5">
               <SizeRange id={inputId} value={norm} onChange={(val)=>updateQuestion(sectionId, question.id, val)} />
             </div>
           )
@@ -560,6 +604,7 @@ const NFRAssessmentForm: React.FC = () => {
               updateQuestion(sectionId, question.id, newValues)
             }}
             className="mt-1"
+            layout={(question.id === 'transactions' || question.id === 'search-analytics' || question.id === 'data-storage-config') ? 'inline' : 'stack'}
           />
         )
 
@@ -679,15 +724,30 @@ const NFRAssessmentForm: React.FC = () => {
               <div className="p-4 space-y-4">
                 {section.questions.map((question) => (
                   <div key={question.id} className="space-y-2">
-                    <label htmlFor={`${section.id}-${question.id}`} className="block">
-                      <span className="text-sm font-medium text-gray-700">
-                        {question.text}
-                        {question.isRequired && <span className="text-red-500 ml-1">*</span>}
-                      </span>
-                      {question.helpText && (
-                        <p className="text-xs text-gray-500 mt-1">{question.helpText}</p>
-                      )}
-                    </label>
+                    {(() => {
+                      const forId = getQuestionLabelTargetId(section.id, question)
+                      return forId ? (
+                        <label htmlFor={forId} className="block">
+                          <span className="text-sm font-medium text-gray-700">
+                            {question.text}
+                            {question.isRequired && <span className="text-red-500 ml-1">*</span>}
+                          </span>
+                          {question.helpText && (
+                            <p className="text-xs text-gray-500 mt-1">{question.helpText}</p>
+                          )}
+                        </label>
+                      ) : (
+                        <div className="block">
+                          <span className="text-sm font-medium text-gray-700">
+                            {question.text}
+                            {question.isRequired && <span className="text-red-500 ml-1">*</span>}
+                          </span>
+                          {question.helpText && (
+                            <p className="text-xs text-gray-500 mt-1">{question.helpText}</p>
+                          )}
+                        </div>
+                      )
+                    })()}
                     {renderQuestion(section.id, question)}
                   </div>
                 ))}

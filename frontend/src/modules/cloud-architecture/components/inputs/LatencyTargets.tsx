@@ -45,9 +45,8 @@ const LatencyTargets: React.FC<LatencyTargetsProps> = ({ id, value, onChange, cl
 
   const update = (key: 'p95'|'p99', raw: string) => {
     const n = raw === '' ? '' : parseInt(raw, 10)
-    const next = { ...internal, [key]: (isNaN(n as any) ? '' : (n as any)) } as LatencyTargetsValueMs
+    const next = { ...internal, [key]: (isNaN(n as any) ? raw : (n as any)) } as any
     setInternal(next)
-    onChange(next)
   }
 
   const p95 = typeof internal.p95 === 'number' ? internal.p95 : NaN
@@ -64,28 +63,27 @@ const LatencyTargets: React.FC<LatencyTargetsProps> = ({ id, value, onChange, cl
     const val = key === 'p95' ? internal.p95 : internal.p99
     const setErr = key === 'p95' ? setP95Err : setP99Err
     const ref = key === 'p95' ? p95Ref : p99Ref
-    if (val === '' || typeof val === 'number') { setErr(''); return true }
+    if (val === '' || typeof val === 'number') { setErr(''); onChange(internal); return true }
     setErr('Enter a valid number')
-    setTimeout(()=>ref.current?.focus(), 0)
     return false
   }
 
   return (
     <div className={`space-y-2 ${className}`}>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
+      <div className="flex items-end gap-3 flex-wrap">
+        <div className="flex-0">
           <label htmlFor={`${id}-p95`} className="block text-xs font-medium text-gray-700 mb-1">P95 (ms)</label>
-          <div className="flex items-center gap-2">
-            <input id={`${id}-p95`} ref={p95Ref} inputMode="numeric" pattern="[0-9]*" className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm ${p95Err ? 'border-red-400' : 'border-gray-300'}`} placeholder="200" value={internal.p95}
+          <div className="flex items-center gap-1">
+            <input id={`${id}-p95`} ref={p95Ref} inputMode="numeric" pattern="[0-9]*" className={`block w-24 px-2 py-1.5 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${p95Err ? 'border-red-400' : 'border-gray-300'}`} placeholder="200" value={internal.p95}
               onChange={(e)=>{ setP95Err(''); update('p95', e.target.value)}} onBlur={()=>validateNumber('p95')} />
             <div className="text-[10px] text-gray-500 whitespace-nowrap">{secHint(internal.p95)}</div>
           </div>
           {p95Err && <div className="text-[10px] text-red-600 mt-0.5">{p95Err}</div>}
         </div>
-        <div>
+        <div className="flex-0">
           <label htmlFor={`${id}-p99`} className="block text-xs font-medium text-gray-700 mb-1">P99 (ms)</label>
-          <div className="flex items-center gap-2">
-            <input id={`${id}-p99`} ref={p99Ref} inputMode="numeric" pattern="[0-9]*" className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm ${p99Err ? 'border-red-400' : 'border-gray-300'}`} placeholder="500" value={internal.p99}
+          <div className="flex items-center gap-1">
+            <input id={`${id}-p99`} ref={p99Ref} inputMode="numeric" pattern="[0-9]*" className={`block w-24 px-2 py-1.5 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${p99Err ? 'border-red-400' : 'border-gray-300'}`} placeholder="500" value={internal.p99}
               onChange={(e)=>{ setP99Err(''); update('p99', e.target.value)}} onBlur={()=>validateNumber('p99')} />
             <div className="text-[10px] text-gray-500 whitespace-nowrap">{secHint(internal.p99)}</div>
           </div>

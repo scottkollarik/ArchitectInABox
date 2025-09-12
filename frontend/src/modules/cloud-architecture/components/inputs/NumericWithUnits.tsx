@@ -63,6 +63,11 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
         if (max !== undefined && constrainedValue > max) constrainedValue = max
         
         processedValue = constrainedValue
+      } else {
+        // invalid: set internal only, show error, do not commit
+        setErr('Enter a valid number')
+        setInternalValue(v => ({ ...v, value: newValue as any }))
+        return
       }
     }
 
@@ -95,12 +100,11 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
     const val = internalValue.value
     if (val === '' || typeof val === 'number') { setErr(''); return }
     setErr('Enter a valid number')
-    setTimeout(()=>inputRef.current?.focus(), 0)
   }
 
   return (
-    <div className={`flex space-x-2 ${className}`}>
-      <div className="flex-1">
+    <div className={`flex items-end gap-2 ${className}`}>
+      <div className="flex-1 min-w-[6rem]">
         {label && (
           <label htmlFor={id} className="block text-xs font-medium text-gray-700 mb-1">
             {label}
@@ -113,7 +117,7 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
           ref={inputRef}
           onChange={(e) => { setErr(''); handleValueChange(e.target.value) }}
           onBlur={validateBlur}
-          className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm ${err ? 'border-red-400' : 'border-gray-300'}`}
+          className={`block w-full px-2 py-1.5 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${err ? 'border-red-400' : 'border-gray-300'}`}
           placeholder={placeholder}
           disabled={disabled}
           min={min}
@@ -122,23 +126,32 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
         />
         {err && <div className="text-[10px] text-red-600 mt-0.5">{err}</div>}
       </div>
-      
-      <div className="flex-shrink-0" style={{ minWidth: '80px' }}>
-        {label && (
-          <div className="block text-xs font-medium text-transparent mb-1">Unit</div>
+      {/* Unit: render select for multiple options; render a compact badge for single unit */}
+      <div className="flex-shrink-0">
+        {units.length > 1 ? (
+          <div>
+            {label && <div className="block text-xs font-medium text-transparent mb-1">Unit</div>}
+            <select
+              value={internalValue.unit}
+              onChange={(e) => handleUnitChange(e.target.value)}
+              className="block w-20 px-2 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm"
+              disabled={disabled}
+            >
+              {units.map((unit) => (
+                <option key={unit} value={unit}>
+                  {unit}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div>
+            {label && <div className="block text-xs font-medium text-transparent mb-1">Unit</div>}
+            <span className="inline-block px-2 py-1.5 text-xs border border-gray-300 rounded-md bg-white text-gray-700 w-12 text-center">
+              {internalValue.unit}
+            </span>
+          </div>
         )}
-        <select
-          value={internalValue.unit}
-          onChange={(e) => handleUnitChange(e.target.value)}
-          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
-          disabled={disabled}
-        >
-          {units.map((unit) => (
-            <option key={unit} value={unit}>
-              {unit}
-            </option>
-          ))}
-        </select>
       </div>
     </div>
   )

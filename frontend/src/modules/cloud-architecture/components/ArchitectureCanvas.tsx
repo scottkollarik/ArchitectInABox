@@ -80,7 +80,15 @@ const ArchitectureCanvas: React.FC = () => {
       requiredBy: []
     }
 
-    setSelectedServices(prev => [...prev, newService, ...requiredDeps])
+    setSelectedServices(prev => {
+      const next = [...prev, newService, ...requiredDeps]
+      const seen = new Set<string>()
+      return next.filter(s => {
+        if (seen.has(s.id)) return false
+        seen.add(s.id)
+        return true
+      })
+    })
     setAutoIncludedServices(newAutoIncluded)
     
     // Notifications
@@ -161,7 +169,9 @@ const ArchitectureCanvas: React.FC = () => {
     const groups: Record<string, AzureService[]> = {}
     selectedServices.forEach(s => {
       if (!groups[s.category]) groups[s.category] = []
-      groups[s.category].push(s)
+      if (!groups[s.category].some(x => x.id === s.id)) {
+        groups[s.category].push(s)
+      }
     })
     return groups
   }, [selectedServices])
@@ -190,7 +200,14 @@ const ArchitectureCanvas: React.FC = () => {
         if (isAutoIncluded) auto.add(id)
       }
     })
-    setSelectedServices(rebuilt)
+    // ensure unique ids when rehydrating
+    const seenIds = new Set<string>()
+    const unique = rebuilt.filter(s => {
+      if (seenIds.has(s.id)) return false
+      seenIds.add(s.id)
+      return true
+    })
+    setSelectedServices(unique)
     setAutoIncludedServices(auto)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProject?.id])

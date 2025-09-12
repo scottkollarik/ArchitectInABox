@@ -346,24 +346,39 @@ export const nfrSections: NFRSection[] = [
       {
         id: 'transactions',
         text: 'Transactions required across entities? (ACID scope)',
-        inputType: 'text',
+        inputType: 'conditional-fieldset',
         isRequired: false,
         isOptional: true,
         isCompleted: false,
         architectureImpact: 'important',
-        placeholder: 'e.g., Single table transactions only',
-        helpText: 'Affects database choice and microservices design'
+        helpText: 'Scope and frequency inform DB choice vs saga/outbox patterns',
+        conditionalFields: [
+          { id: 'tx-scope', type: 'select', label: 'Transaction scope', options: ['Single-entity/table', 'Multi-entity (same DB)', 'Cross-database', 'Cross-service (saga)'], required: false, visible: true },
+          { id: 'consistency', type: 'select', label: 'Consistency model', options: ['Strong (ACID)', 'Eventual (saga/outbox)', 'Exactly-once required'], required: false, visible: true },
+          { id: 'tx-frequency', type: 'numeric-with-units', label: 'Requests in a transaction', units: ['%'], defaultUnit: '%', required: false, visible: true },
+          { id: 'tx-duration', type: 'numeric-with-units', label: 'Max transaction duration', units: ['s'], defaultUnit: 's', required: false, visible: true },
+          { id: 'notes', type: 'text', label: 'Notes', placeholder: 'Nuance or exceptions', required: false, visible: true }
+        ],
+        conditionalRules: []
       },
       {
         id: 'search-analytics',
         text: 'Search, analytics, or reporting needs?',
-        inputType: 'text',
+        inputType: 'conditional-fieldset',
         isRequired: false,
         isOptional: true,
         isCompleted: false,
         architectureImpact: 'nice-to-have',
-        placeholder: 'e.g., Full-text search, daily reports',
-        helpText: 'May require additional services like Azure Search'
+        helpText: 'Pick use cases and freshness to guide analytics architecture',
+        conditionalFields: [
+          { id: 'use-cases', type: 'multiselect', label: 'Use cases', options: ['Operational reporting', 'BI dashboards', 'Ad-hoc SQL', 'Batch ETL', 'Real-time streaming', 'ML feature store/training', 'Full-text search'], required: false, visible: true },
+          { id: 'freshness', type: 'select', label: 'Data freshness target', options: ['Real-time (<1 min)', 'Near-real-time (1–15 min)', 'Hourly', 'Daily'], required: false, visible: true },
+          { id: 'daily-ingest', type: 'numeric-with-units', label: 'Daily ingest', units: ['GB', 'TB'], defaultUnit: 'GB', required: false, visible: true },
+          { id: 'dataset-size', type: 'numeric-with-units', label: 'Active dataset size', units: ['GB', 'TB'], defaultUnit: 'TB', required: false, visible: true },
+          { id: 'platform-pref', type: 'multiselect', label: 'Platform preference', options: ['Synapse', 'Databricks', 'ADLS Gen2', 'Snowflake', 'Azure AI Search', 'Elastic/OpenSearch'], required: false, visible: true },
+          { id: 'notes', type: 'text', label: 'Notes', placeholder: 'Scope, sources, consumers', required: false, visible: true }
+        ],
+        conditionalRules: []
       }
     ]
   },
