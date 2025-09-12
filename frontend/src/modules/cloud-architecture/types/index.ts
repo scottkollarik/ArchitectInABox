@@ -325,8 +325,10 @@ export interface ConditionalRule {
 export interface ProjectCloudConfig {
   provider: 'azure'
   cloudFamily: 'public' | 'gov'
+  drStrategy?: 'paired' | 'manual' | 'none'
   primaryRegionId?: string
   secondaryRegionId?: string
+  additionalRegions?: string[]
   policies?: {
     residency?: 'in-country' | 'in-geo' | 'no-restriction' | 'custom'
     countries?: string[]

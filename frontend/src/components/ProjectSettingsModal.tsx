@@ -14,8 +14,10 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
   const [projectDescription, setProjectDescription] = useState('')
   const [editingIdentity, setEditingIdentity] = useState(false)
 
+  // Seed form state only when opening or when project changes, to avoid
+  // clobbering user edits due to unrelated project updates (e.g., NFR autosave)
   useEffect(() => {
-    if (!currentProject) return
+    if (!open || !currentProject) return
     setCloudFamily(currentProject.cloud?.cloudFamily || 'public')
     setProfile(currentProject.profile || { level: 'starter', size: 'M', criticality: 'dev/test' })
     setProjectName(currentProject.name || '')
@@ -23,12 +25,12 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
     // Derive region selection object from cloud
     const rs: any = {}
     rs.primary = currentProject.cloud?.primaryRegionId
-    rs.drStrategy = currentProject.cloud?.secondaryRegionId ? 'manual' : 'none'
+    rs.drStrategy = (currentProject.cloud?.drStrategy as any) || (currentProject.cloud?.secondaryRegionId ? 'manual' : 'none')
     rs.secondary = currentProject.cloud?.secondaryRegionId
     setRegionSelection(rs)
     setResidencyPolicy((currentProject.cloud?.policies?.residency as any) || 'no-restriction')
     setResidencyCountries(currentProject.cloud?.policies?.countries || [])
-  }, [currentProject])
+  }, [open, currentProject?.id])
 
   if (!open) return null
 
@@ -39,6 +41,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
       cloud: {
         provider: 'azure',
         cloudFamily,
+        drStrategy: regionSelection?.drStrategy || 'none',
         primaryRegionId: regionSelection?.primary,
         secondaryRegionId: regionSelection?.drStrategy === 'paired' ? regionSelection?.pairedSuggestion : regionSelection?.secondary,
         policies: { residency: residencyPolicy, countries: residencyCountries }

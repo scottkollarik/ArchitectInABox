@@ -4,7 +4,8 @@ import {
   PlusIcon, 
   FolderIcon,
   ClockIcon,
-  TrashIcon
+  TrashIcon,
+  Cog6ToothIcon
 } from '@heroicons/react/24/outline'
 import { useProject } from '../context/ProjectContext'
 import ProjectSettingsModal from './ProjectSettingsModal'
@@ -45,7 +46,7 @@ const ProjectHeader: React.FC<{ compact?: boolean }> = ({ compact = false }) => 
   // Compact rendering for top header integration
   if (compact) {
     return (
-      <div className="relative">
+      <div className="relative flex items-center">
         {/* Selector button */}
         <button
           onClick={() => setShowProjectMenu(!showProjectMenu)}
@@ -56,10 +57,20 @@ const ProjectHeader: React.FC<{ compact?: boolean }> = ({ compact = false }) => 
           <span className="text-sm font-medium truncate max-w-[180px]">{currentProject?.name || 'No Project Selected'}</span>
           <ChevronDownIcon className="w-4 h-4" />
         </button>
+        {/* Quick access to Project Settings in compact header */}
+        {currentProject && (
+          <button
+            onClick={() => setShowSettings(true)}
+            className="ml-2 inline-flex items-center justify-center p-1.5 text-white/90 hover:text-white hover:bg-white/10 rounded align-middle"
+            title="Project Settings"
+          >
+            <Cog6ToothIcon className="w-4 h-4" />
+          </button>
+        )}
 
         {/* Dropdown */}
         {showProjectMenu && (
-          <div className="absolute right-0 mt-2 w-80 bg-white border border-architect-gray-200 rounded-lg shadow-lg z-50">
+          <div className="absolute right-0 top-full mt-2 w-96 bg-white border border-architect-gray-200 rounded-lg shadow-lg z-50">
             <div className="p-3 border-b border-architect-gray-100 flex items-center justify-between">
               <h3 className="font-semibold text-architect-gray-900">Projects</h3>
               <button
@@ -91,7 +102,7 @@ const ProjectHeader: React.FC<{ compact?: boolean }> = ({ compact = false }) => 
                   >
                     <div className="font-medium text-architect-gray-900 truncate">{project.name}</div>
                     {project.description && (
-                      <div className="text-xs text-architect-gray-600 truncate">{project.description}</div>
+                      <div className="text-xs text-architect-gray-600 whitespace-normal break-words">{project.description}</div>
                     )}
                   </button>
                 ))
@@ -161,6 +172,11 @@ const ProjectHeader: React.FC<{ compact?: boolean }> = ({ compact = false }) => 
               </div>
             </div>
           </div>
+        )}
+
+        {/* Project Settings Modal (compact) */}
+        {showSettings && (
+          <ProjectSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
         )}
       </div>
     )

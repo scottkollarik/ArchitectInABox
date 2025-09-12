@@ -43,7 +43,7 @@ const createEmptyProject = (id: string, name: string, description: string): Proj
   description,
   createdAt: new Date(),
   lastModified: new Date(),
-  cloud: { provider: 'azure', cloudFamily: 'public' },
+  cloud: { provider: 'azure', cloudFamily: 'public', drStrategy: 'none' },
   profile: { level: 'starter', size: 'M', criticality: 'dev/test' }
 })
 

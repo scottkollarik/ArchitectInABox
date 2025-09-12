@@ -52,6 +52,8 @@ const AlignmentReportDrawer: React.FC<{ open: boolean; onClose: () => void }>=({
       platformPreference,
       serverlessAcceptable,
       monthlyBudget,
+      cloud: currentProject?.cloud,
+      multiRegion: find('multi-region')
     } as any
   }
 
@@ -103,7 +105,13 @@ const AlignmentReportDrawer: React.FC<{ open: boolean; onClose: () => void }>=({
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs text-architect-gray-700 mt-2">
               <div><span className="text-architect-gray-500">R/W Ratio:</span> {nfr.readWriteRatio ? `${nfr.readWriteRatio.read || 0}% read / ${nfr.readWriteRatio.write || 0}% write` : '—'}</div>
-              <div><span className="text-architect-gray-500">Item size:</span> {nfr.itemSize ? `${nfr.itemSize.min ?? '—'}–${nfr.itemSize.max ?? '—'} ${nfr.itemSize.unit || ''}` : '—'}</div>
+              <div><span className="text-architect-gray-500">Item size:</span> {nfr.itemSize ? (() => {
+                const min = nfr.itemSize.min ?? '—'
+                const max = nfr.itemSize.max ?? '—'
+                const minU = nfr.itemSize.minUnit || nfr.itemSize.unit || ''
+                const maxU = nfr.itemSize.maxUnit || nfr.itemSize.unit || ''
+                return `${min}${minU ? ' ' + minU : ''}–${max}${maxU ? ' ' + maxU : ''}`
+              })() : '—'}</div>
             </div>
           </div>
 

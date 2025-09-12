@@ -186,6 +186,7 @@ const AzureServicesBrowser: React.FC = () => {
                         size={getEffectiveSize(service.id, currentProject || undefined)}
                         onSizeChange={(sz) => persistOverrideSize(updateProject, currentProject, service.id, sz)}
                         cloudFamily={currentProject?.cloud?.cloudFamily || 'public'}
+                        regionMultiplier={getRegionMultiplier(currentProject)}
                       />
                     ))}
                   </div>
@@ -215,7 +216,7 @@ const AzureServicesBrowser: React.FC = () => {
   )
 }
 
-const DraggableServiceCard: React.FC<{ service: AzureService; size?: SizingLevel | ''; onSizeChange?: (s: SizingLevel | '') => void; cloudFamily: 'public'|'gov' }> = ({ service, size='M', onSizeChange, cloudFamily }) => {
+const DraggableServiceCard: React.FC<{ service: AzureService; size?: SizingLevel | ''; onSizeChange?: (s: SizingLevel | '') => void; cloudFamily: 'public'|'gov'; regionMultiplier?: number }> = ({ service, size='M', onSizeChange, cloudFamily, regionMultiplier = 1 }) => {
   const cardRef = useRef<HTMLDivElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const [{ isDragging }, drag, preview] = useDrag({
@@ -308,7 +309,14 @@ const DraggableServiceCard: React.FC<{ service: AzureService; size?: SizingLevel
             <CurrencyDollarIcon className="w-3 h-3" />
             <span className="font-medium">{service.pricing.estimate}</span>
           </div>
-          <span className="text-architect-gray-500">{service.pricing.unit}</span>
+          <div className="flex items-center gap-2">
+            {regionMultiplier > 1 && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200" title="Based on Project Settings: regions multiplier">
+                x{regionMultiplier} regions
+              </span>
+            )}
+            <span className="text-architect-gray-500">{service.pricing.unit}</span>
+          </div>
         </div>
 
         {/* Sizing */}
@@ -412,6 +420,19 @@ function persistOverrideSize(updateProject: (u: any)=>Promise<void>, project: an
     nextOverrides[serviceId] = { ...(nextOverrides[serviceId] || {}), size }
   }
   return updateProject({ architecture: { ...arch, overrides: nextOverrides, lastSaved: new Date().toISOString() } })
+}
+
+function getRegionMultiplier(project: any): number {
+  try {
+    const cloud = project?.cloud || {}
+    const base = 1
+    const dr = cloud.drStrategy && cloud.drStrategy !== 'none' ? 1 : 0
+    const manualSecondaryOnly = !cloud.drStrategy && cloud.secondaryRegionId ? 1 : 0
+    const extras = Array.isArray(cloud.additionalRegions) ? cloud.additionalRegions.length : 0
+    return Math.max(1, base + dr + manualSecondaryOnly + extras)
+  } catch {
+    return 1
+  }
 }
 
 export default AzureServicesBrowser

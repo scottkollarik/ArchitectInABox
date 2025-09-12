@@ -822,6 +822,25 @@ export const generateRecommendations = (nfrAssessment: any) => {
     recommendations.push(getServiceById('adls-gen2'))
   }
 
+  // Global entry and multi-region routing
+  try {
+    const multiRegionSetting = nfrAssessment?.multiRegion
+    const cloud = nfrAssessment?.cloud || {}
+    const isMultiRegion =
+      (multiRegionSetting && multiRegionSetting !== 'Not needed') ||
+      (cloud?.drStrategy && cloud.drStrategy !== 'none') ||
+      (!!cloud?.secondaryRegionId)
+    if (isMultiRegion) {
+      // Azure Front Door on public cloud; fallback to App Gateway for gov
+      if ((cloud?.cloudFamily || 'public') === 'public') {
+        recommendations.push(getServiceById('front-door'))
+      } else {
+        // App Gateway may act as alternative if Front Door unavailable
+        recommendations.push(getServiceById('app-gateway'))
+      }
+    }
+  } catch {}
+
   // API management
   if (reqTypes.includes('api')) {
     recommendations.push(getServiceById('api-management'))
