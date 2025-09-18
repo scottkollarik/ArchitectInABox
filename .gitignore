@@ -19,6 +19,19 @@ node_modules/
 .env.test.local
 .env.production.local
 
+# Environment files with secrets (NEVER commit these!)
+.env.production
+.env.development
+.env.shared-cloud-dev
+.env.staging
+.env.prod
+*.prod.env
+*.production.env
+*.dev.env
+
+# OAuth configuration files (contain secrets)
+.env.oauth
+
 # Runtime data
 pids
 *.pid
@@ -158,3 +171,4 @@ temp/
 
 # Docker
 .dockerignore
+.fake
