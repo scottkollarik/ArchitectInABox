@@ -5,11 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:oauth": "../scripts/env-switch.sh oauth-dev && vite",
+    "dev:prod-like": "../scripts/env-switch.sh production && vite --mode production",
     "build": "tsc && vite build",
+    "build:dev": "../scripts/env-switch.sh development && tsc && vite build --mode development",
+    "build:prod": "../scripts/env-switch.sh production && tsc && vite build --mode production",
     "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "env:local": "../scripts/env-switch.sh local",
+    "env:oauth": "../scripts/env-switch.sh oauth-dev",
+    "env:prod": "../scripts/env-switch.sh production"
   },
   "dependencies": {
+    "@azure/msal-browser": "^3.0.0",
     "@heroicons/react": "^2.0.18",
     "axios": "^1.5.0",
     "react": "^18.2.0",

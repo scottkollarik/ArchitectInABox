@@ -4,7 +4,8 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
+    working_dir: /app
     ports:
       - "5173:5173"
     environment:
@@ -12,21 +13,53 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    command: ["sh", "-c", "npm install && npm run dev -- --host"]
     networks:
       - app-network
 
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
       - "5001:5000"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__MongoDB=mongodb://host.docker.internal:27017/technical-architect-db
+      - ConnectionStrings__MongoDB=mongodb://admin:password123@mongodb:27017/technical-architect-db?authSource=admin
+      - ConnectionStrings__AzureBlob=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
       - ASPNETCORE_URLS=http://0.0.0.0:5000
+    depends_on:
+      - azurite
+      - mongodb
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend:/src
+      - backend-nuget-cache:/root/.nuget/packages
+    working_dir: /src
+    command: ["bash", "-c", "dotnet restore && dotnet watch --project TechnicalArchitectPlatform.Api run --urls http://0.0.0.0:5000"]
+    networks:
+      - app-network
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+    ports:
+      - "10000:10000" # blob
+      - "10001:10001" # queue
+      - "10002:10002" # table
+    volumes:
+      - azurite-data:/data
+    networks:
+      - app-network
+
+  mongodb:
+    image: mongo:6
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password123
+    volumes:
+      - mongo-data:/data/db
     networks:
       - app-network
 
@@ -34,3 +67,11 @@ services:
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  azurite-data:
+    driver: local
+  mongo-data:
+    driver: local
+  backend-nuget-cache:
+    driver: local

@@ -1,8 +1,14 @@
 // NFR Assessment Types
+export interface NFRInfoPopover {
+  title: string
+  description?: string
+  bullets?: { label?: string; text: string }[]
+}
+
 export interface NFRQuestion {
   id: string
   text: string
-  inputType: 'text' | 'select' | 'number' | 'checkbox' | 'multiselect' | 'compound' | 'card-list' | 'numeric-with-units' | 'conditional-fieldset' | 'azure-region' | 'percentage-split' | 'latency-targets' | 'size-range' | 'textarea'
+  inputType: 'text' | 'select' | 'number' | 'checkbox' | 'multiselect' | 'compound' | 'card-list' | 'numeric-with-units' | 'conditional-fieldset' | 'azure-region' | 'percentage-split' | 'latency-targets' | 'size-range' | 'textarea' | 'subheading' | 'multiselect-with-notes'
   isRequired: boolean
   isOptional: boolean
   isCompleted: boolean
@@ -13,6 +19,7 @@ export interface NFRQuestion {
   options?: string[]
   placeholder?: string
   helpText?: string
+  infoPopover?: NFRInfoPopover
   compoundFields?: CompoundField[]
   cardConfig?: CardConfig
   // New properties for structured inputs
@@ -23,15 +30,18 @@ export interface NFRQuestion {
   allowDecimals?: boolean
   conditionalFields?: ConditionalField[]
   conditionalRules?: ConditionalRule[]
+  notesPlaceholder?: string
 }
 
 export interface CompoundField {
   id: string
   label: string
-  type: 'number' | 'select' | 'text'
+  type: 'number' | 'select' | 'text' | 'numeric-with-units'
   options?: string[]
   placeholder?: string
   suffix?: string
+  units?: string[]
+  defaultUnit?: string
 }
 
 export interface CardConfig {
@@ -136,6 +146,17 @@ export interface ProjectConstraints {
   allowServiceIds?: string[]
   denyServiceIds?: string[]
   notes?: string
+  // Optional NFR field locks driven by blueprint
+  nfrLocks?: NFRFieldLock[]
+}
+
+export interface NFRFieldLock {
+  // Dot path with optional array marker. Examples:
+  //  - data.consistency-level
+  //  - data.models[].consistency
+  path: string
+  mode: 'locked' | 'policy-only'
+  allowedValues?: string[]
 }
 
 export type SizingLevel = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'Custom'
@@ -339,4 +360,6 @@ export interface ProjectProfile {
   level: 'starter' | 'standard' | 'enterprise' | 'custom'
   size: SizingLevel
   criticality: 'dev/test' | 'prod' | 'regulated'
+  // Optional NFR defaults bundle
+  recipe?: string
 }

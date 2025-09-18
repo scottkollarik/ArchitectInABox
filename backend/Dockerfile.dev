@@ -1,0 +1,9 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0
+
+WORKDIR /src
+
+ENV ASPNETCORE_ENVIRONMENT=Development
+ENV ASPNETCORE_URLS=http://0.0.0.0:5000
+ENV DOTNET_USE_POLLING_FILE_WATCHER=true
+
+CMD ["bash", "-c", "dotnet restore && dotnet watch --project TechnicalArchitectPlatform.Api run --urls http://0.0.0.0:5000"]

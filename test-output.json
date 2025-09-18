@@ -1,0 +1,197 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "7424507103266519088"
+    }
+  },
+  "parameters": {
+    "namePrefix": {
+      "type": "string"
+    },
+    "backendImage": {
+      "type": "string"
+    },
+    "frontendImage": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "appShortName": {
+      "type": "string",
+      "defaultValue": "aib"
+    },
+    "enableSearch": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "customDomain": {
+      "type": "string",
+      "defaultValue": ""
+    }
+  },
+  "variables": {
+    "saName": "[toLower(replace(format('{0}sa{1}', parameters('namePrefix'), uniqueString(resourceGroup().id)), '-', ''))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[variables('saName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "accessTier": "Hot",
+        "minimumTlsVersion": "TLS1_2"
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts",
+      "apiVersion": "2023-04-15",
+      "name": "[format('{0}-cosmos', parameters('namePrefix'))]",
+      "location": "[parameters('location')]",
+      "kind": "GlobalDocumentDB",
+      "properties": {
+        "databaseAccountOfferType": "Standard",
+        "capabilities": [
+          {
+            "name": "EnableServerless"
+          }
+        ],
+        "locations": [
+          {
+            "locationName": "[parameters('location')]",
+            "failoverPriority": 0
+          }
+        ],
+        "consistencyPolicy": {
+          "defaultConsistencyLevel": "Session"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+      "apiVersion": "2023-04-15",
+      "name": "[format('{0}/{1}', format('{0}-cosmos', parameters('namePrefix')), 'tapdb')]",
+      "properties": {
+        "resource": {
+          "id": "tapdb"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', format('{0}-cosmos', parameters('namePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}-cae', parameters('namePrefix'))]",
+      "location": "[parameters('location')]",
+      "properties": {}
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}-backend', parameters('namePrefix'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('{0}-cae', parameters('namePrefix')))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 5000
+          },
+          "activeRevisionsMode": "Single"
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "api",
+              "image": "[parameters('backendImage')]",
+              "env": [
+                {
+                  "name": "PathBase",
+                  "value": "[format('/{0}', parameters('appShortName'))]"
+                },
+                {
+                  "name": "ASPNETCORE_ENVIRONMENT",
+                  "value": "Production"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": 0,
+            "maxReplicas": 2
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', format('{0}-cae', parameters('namePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}-frontend', parameters('namePrefix'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('{0}-cae', parameters('namePrefix')))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 80
+          },
+          "activeRevisionsMode": "Single"
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "web",
+              "image": "[parameters('frontendImage')]",
+              "env": [
+                {
+                  "name": "VITE_BASE_PATH",
+                  "value": "[format('/{0}', parameters('appShortName'))]"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": 0,
+            "maxReplicas": 2
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', format('{0}-cae', parameters('namePrefix')))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "storageAccountName": {
+      "type": "string",
+      "value": "[variables('saName')]"
+    },
+    "cosmosAccountName": {
+      "type": "string",
+      "value": "[format('{0}-cosmos', parameters('namePrefix'))]"
+    },
+    "backendAppName": {
+      "type": "string",
+      "value": "[format('{0}-backend', parameters('namePrefix'))]"
+    },
+    "frontendAppName": {
+      "type": "string",
+      "value": "[format('{0}-frontend', parameters('namePrefix'))]"
+    }
+  }
+}

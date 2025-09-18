@@ -18,11 +18,11 @@ A comprehensive cloud architecture planning and learning tool that helps Technic
 
 ### Development Setup
 
-1. **Clone and start services:**
+1. **Clone and start services (local dev stack):**
    ```bash
    git clone <repository-url>
    cd technical-architect-platform
-   docker-compose up --build
+   docker compose up --build
    ```
 
 2. **Access the application:**
@@ -50,7 +50,7 @@ A comprehensive cloud architecture planning and learning tool that helps Technic
 ```
 technical-architect-platform/
 ├── README.md                    # This file
-├── docker-compose.yml          # Container orchestration
+├── docker-compose.yml          # Local dev containers (hot reload)
 ├── .env.example               # Environment variables template
 ├── frontend/                  # React application
 │   ├── src/
@@ -58,12 +58,30 @@ technical-architect-platform/
 │   │   │   └── cloud-architecture/  # Main feature module
 │   │   ├── components/        # Shared components
 │   │   └── styles/           # Global styles
-│   └── Dockerfile            # Frontend container
+│   ├── Dockerfile.dev        # Frontend dev container (Vite)
+│   ├── Dockerfile            # Frontend production build (nginx)
+│   └── nginx.conf            # SPA routing config for production image
 └── backend/                  # ASP.NET Core API
     ├── TechnicalArchitectPlatform.Api/
     │   ├── Program.cs        # Minimal APIs setup
     │   └── *.csproj         # Project configuration
-    └── Dockerfile           # Backend container
+    ├── Dockerfile.dev       # Backend dev container (dotnet watch)
+    └── Dockerfile           # Backend production image
+
+## Building Production Images (linux/amd64)
+
+Deployments to Azure Container Apps require amd64 images. Use the helper script to build and optionally push matching backend/front-end images:
+
+```bash
+# Push linux/amd64 images to GHCR (or your registry)
+./scripts/build-containers.sh ghcr.io/<user> latest --push
+
+# Load linux/amd64 images into the local Docker engine instead of pushing
+./scripts/build-containers.sh ghcr.io/<user> test --load
+```
+
+The script wraps `docker buildx build` with the production Dockerfiles (`backend/Dockerfile`, `frontend/Dockerfile`).
+Override the build platform with `PLATFORM=<value>` if you need a different target (defaults to `linux/amd64`).
 ```
 
 ## Usage

@@ -64,7 +64,7 @@ const AzureRegionSelector: React.FC<AzureRegionSelectorProps> = ({ id, value, on
             id={`${id}-primary`}
             value={primary}
             onChange={(e) => handlePrimary(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+            className="inline-block w-64 max-w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
           >
             <option value="">Select a region...</option>
             {azureRegions.map(r => (
@@ -79,7 +79,7 @@ const AzureRegionSelector: React.FC<AzureRegionSelectorProps> = ({ id, value, on
             id={`${id}-strategy`}
             value={drStrategy}
             onChange={(e) => handleStrategy(e.target.value as DRStrategy)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+            className="inline-block w-64 max-w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
           >
             <option value="paired">Use Paired Region</option>
             <option value="manual">Manual Secondary</option>
@@ -103,7 +103,7 @@ const AzureRegionSelector: React.FC<AzureRegionSelectorProps> = ({ id, value, on
                 id={`${id}-secondary`}
                 value={secondary || ''}
                 onChange={(e) => handleSecondary(e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+                className="inline-block w-64 max-w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
               >
                 <option value="">Select a region...</option>
                 {azureRegions

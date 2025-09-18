@@ -35,15 +35,15 @@ const PercentageSplit: React.FC<PercentageSplitProps> = ({ id, value, onChange, 
   }, [internal])
 
   const setRead = useCallback((v: string) => {
-    const n = v === '' ? '' : clamp(parseInt(v, 10))
-    const next = { ...internal, read: n }
+    const n: '' | number = v === '' ? '' : clamp(parseInt(v, 10))
+    const next: PercentageSplitValue = { ...internal, read: n }
     setInternal(next)
     onChange(next)
   }, [internal, onChange])
 
   const setWrite = useCallback((v: string) => {
-    const n = v === '' ? '' : clamp(parseInt(v, 10))
-    const next = { ...internal, write: n }
+    const n: '' | number = v === '' ? '' : clamp(parseInt(v, 10))
+    const next: PercentageSplitValue = { ...internal, write: n }
     setInternal(next)
     onChange(next)
   }, [internal, onChange])

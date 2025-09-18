@@ -19,6 +19,8 @@ const AlignmentReportDrawer: React.FC<{ open: boolean; onClose: () => void }>=({
     const expectedRps = find('expected-rps')
     const trafficPattern = find('traffic-pattern')
     const rpsCompound = find('peak-vs-average') as any
+    const scaleBaseline = find('scale-baseline') as any
+    const requestTypesRaw = find('request-types') as any
     const avgRps = rpsCompound?.['average-rps'] || ''
     const peakRps = rpsCompound?.['peak-rps'] || ''
     const latencyTargets = find('latency-targets') as any
@@ -43,6 +45,18 @@ const AlignmentReportDrawer: React.FC<{ open: boolean; onClose: () => void }>=({
       avgRps,
       peakRps,
       latencyTargets,
+      scaleBaseline,
+      requestCharacteristics: (() => {
+        if (!requestTypesRaw) return undefined
+        if (Array.isArray(requestTypesRaw)) return { selections: requestTypesRaw, notes: '' }
+        if (typeof requestTypesRaw === 'object') {
+          const selections = Array.isArray(requestTypesRaw.selections) ? requestTypesRaw.selections : []
+          const notes = typeof requestTypesRaw.notes === 'string' ? requestTypesRaw.notes : ''
+          return { selections, notes }
+        }
+        if (typeof requestTypesRaw === 'string') return { selections: [], notes: requestTypesRaw }
+        return undefined
+      })(),
       dataModels,
       readWriteRatio,
       itemSize,
@@ -87,6 +101,36 @@ const AlignmentReportDrawer: React.FC<{ open: boolean; onClose: () => void }>=({
               <div><span className="text-architect-gray-500">Traffic pattern:</span> {nfr.trafficPattern || '—'}</div>
               <div><span className="text-architect-gray-500">Avg/Peak RPS:</span> {(nfr.avgRps || nfr.peakRps) ? `${nfr.avgRps || '—'} / ${nfr.peakRps || '—'}` : '—'}</div>
               <div><span className="text-architect-gray-500">Latency P95/P99 (ms):</span> {nfr.latencyTargets ? `${nfr.latencyTargets.p95 || '—'} / ${nfr.latencyTargets.p99 || '—'}` : '—'}</div>
+              <div className="col-span-2">
+                <span className="text-architect-gray-500">Initial scale rules:</span>{' '}
+                {nfr.scaleBaseline ? (() => {
+                  const min = nfr.scaleBaseline['min-instances'] || '—'
+                  const max = nfr.scaleBaseline['max-instances'] || '—'
+                  const signal = nfr.scaleBaseline['scale-signal'] || '—'
+                  const threshold = nfr.scaleBaseline['scale-threshold'] || '—'
+                  return `${min} min · ${max} max · ${signal}${threshold && threshold !== '—' ? ` @ ${threshold}` : ''}`
+                })() : '—'}
+              </div>
+              <div className="col-span-2">
+                <span className="text-architect-gray-500">Request semantics:</span>{' '}
+                {(() => {
+                  const rc = nfr.requestCharacteristics
+                  if (!rc) return '—'
+                  const selections = Array.isArray(rc.selections) ? rc.selections.filter(Boolean) : []
+                  const notes = typeof rc.notes === 'string' ? rc.notes.trim() : ''
+                  const hasSelections = selections.length > 0
+                  const hasNotes = notes.length > 0
+                  if (!hasSelections && !hasNotes) return '—'
+                  return (
+                    <span>
+                      {hasSelections ? selections.join(', ') : null}
+                      {hasNotes ? (
+                        <span className="block text-architect-gray-500 mt-0.5">{notes}</span>
+                      ) : null}
+                    </span>
+                  )
+                })()}
+              </div>
             </div>
           </div>
 

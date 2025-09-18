@@ -13,23 +13,43 @@ interface LatencyTargetsProps {
 }
 
 const LatencyTargets: React.FC<LatencyTargetsProps> = ({ id, value, onChange, className = '' }) => {
+  const toMs = (input: any): number | '' => {
+    if (input === null || input === undefined || input === '') return ''
+    if (typeof input === 'number') return input
+    if (typeof input === 'string') {
+      const parsed = parseFloat(input)
+      return Number.isFinite(parsed) ? parsed : ''
+    }
+    if (typeof input === 'object') {
+      const rawValue = input.value ?? input.amount ?? ''
+      if (rawValue === '' || rawValue === null || rawValue === undefined) return ''
+      const numeric = typeof rawValue === 'number' ? rawValue : parseFloat(rawValue)
+      if (!Number.isFinite(numeric)) return ''
+      const unit = (input.unit || input.units || 'ms') as string
+      if (unit === 'seconds' || unit === 's') return numeric * 1000
+      return numeric
+    }
+    return ''
+  }
+
   const normalize = (v: any): LatencyTargetsValueMs => {
     if (v && typeof v === 'object') {
-      // New shape with units
-      if (v.p95 && v.p99) {
-        const p95 = typeof v.p95 === 'number' ? v.p95 : (v.p95?.unit === 'seconds' ? (typeof v.p95?.value === 'number' ? v.p95.value * 1000 : '') : v.p95?.value ?? '')
-        const p99 = typeof v.p99 === 'number' ? v.p99 : (v.p99?.unit === 'seconds' ? (typeof v.p99?.value === 'number' ? v.p99.value * 1000 : '') : v.p99?.value ?? '')
-        return { p95: p95 as any, p99: p99 as any }
-      }
-      // Legacy compound fields
-      if ('p95-value' in v || 'p99-value' in v) {
-        const pv = v['p95-value']
-        const pu = v['p95-unit']
-        const qv = v['p99-value']
-        const qu = v['p99-unit']
+      if ('p95' in v || 'p99' in v) {
         return {
-          p95: pu === 'seconds' ? (typeof pv === 'number' ? pv * 1000 : '') : (pv ?? ''),
-          p99: qu === 'seconds' ? (typeof qv === 'number' ? qv * 1000 : '') : (qv ?? ''),
+          p95: toMs((v as any).p95),
+          p99: toMs((v as any).p99),
+        }
+      }
+      if ('p95-value' in v || 'p99-value' in v) {
+        const legacyToMs = (val: any, unit: string | undefined) => {
+          if (val === '' || val === null || val === undefined) return ''
+          const numeric = typeof val === 'number' ? val : parseFloat(val)
+          if (!Number.isFinite(numeric)) return ''
+          return unit === 'seconds' ? numeric * 1000 : numeric
+        }
+        return {
+          p95: legacyToMs(v['p95-value'], v['p95-unit']),
+          p99: legacyToMs(v['p99-value'], v['p99-unit']),
         } as any
       }
     }

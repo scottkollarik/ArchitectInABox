@@ -7,9 +7,15 @@ interface AvgPeakRpsProps {
   className?: string
 }
 
-const digitsOnly = (s: string) => s.replace(/,/g, '')
+const digitsOnly = (s: string) => s.replace(/\D+/g, '')
 const isNumeric = (s: string) => /^\d+$/.test(s)
-const commifyNumber = (n: number) => n.toLocaleString('en-US')
+const formatNumber = (n: number) => {
+  try {
+    return new Intl.NumberFormat(undefined).format(n)
+  } catch {
+    return n.toString()
+  }
+}
 
 const AvgPeakRps: React.FC<AvgPeakRpsProps> = ({ id, value, onChange, className = '' }) => {
   const avgRef = useRef<HTMLInputElement>(null)
@@ -20,8 +26,17 @@ const AvgPeakRps: React.FC<AvgPeakRpsProps> = ({ id, value, onChange, className 
   const [peakError, setPeakError] = useState<string>('')
 
   useEffect(() => {
-    setAvg(value?.['average-rps'] ? String(value['average-rps']) : '')
-    setPeak(value?.['peak-rps'] ? String(value['peak-rps']) : '')
+    const rawAvg = value?.['average-rps']
+    const rawPeak = value?.['peak-rps']
+    const normalize = (input: string | number | undefined) => {
+      if (input === undefined || input === null || input === '') return ''
+      const raw = digitsOnly(String(input))
+      if (!raw) return String(input)
+      const numeric = parseInt(raw, 10)
+      return Number.isFinite(numeric) ? formatNumber(numeric) : String(input)
+    }
+    setAvg(normalize(rawAvg))
+    setPeak(normalize(rawPeak))
   }, [value?.['average-rps'], value?.['peak-rps']])
 
   const validateAndFormat = (field: 'average-rps' | 'peak-rps') => {
@@ -38,7 +53,7 @@ const AvgPeakRps: React.FC<AvgPeakRpsProps> = ({ id, value, onChange, className 
     }
     // format
     const n = parseInt(raw, 10)
-    const formatted = commifyNumber(n)
+    const formatted = formatNumber(n)
     if (field === 'average-rps') {
       setAvg(formatted)
       setAvgError('')
@@ -57,8 +72,8 @@ const AvgPeakRps: React.FC<AvgPeakRpsProps> = ({ id, value, onChange, className 
     if (isNumeric(aRaw) && isNumeric(pRaw)) {
       const a = parseInt(aRaw, 10)
       const p = parseInt(pRaw, 10)
-      if (a > p) {
-        setPeakError('Peak RPS should be ≥ Average RPS')
+      if (a >= p) {
+        setPeakError('Peak RPS must be greater than Average RPS')
         return false
       } else {
         setPeakError('')
@@ -77,7 +92,7 @@ const AvgPeakRps: React.FC<AvgPeakRpsProps> = ({ id, value, onChange, className 
             ref={avgRef}
             type="text"
             inputMode="numeric"
-            pattern="[0-9,]*"
+            pattern="[0-9\s,.]*"
             value={avg}
             onChange={(e) => {
               setAvg(e.target.value)
@@ -96,7 +111,7 @@ const AvgPeakRps: React.FC<AvgPeakRpsProps> = ({ id, value, onChange, className 
             ref={peakRef}
             type="text"
             inputMode="numeric"
-            pattern="[0-9,]*"
+            pattern="[0-9\s,.]*"
             value={peak}
             onChange={(e) => {
               setPeak(e.target.value)

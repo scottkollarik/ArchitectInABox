@@ -17,7 +17,7 @@ export const nfrSections: NFRSection[] = [
         isCompleted: false,
         architectureImpact: 'critical',
         placeholder: 'e.g., 1,000',
-        helpText: 'Peak requests per second your application needs to handle (large numbers allowed, no stepper)'
+        helpText: 'Expected steady-state requests per second (average load). Large numbers allowed, no stepper.'
       },
       {
         id: 'traffic-pattern',
@@ -56,6 +56,51 @@ export const nfrSections: NFRSection[] = [
         ]
       },
       {
+        id: 'scale-baseline',
+        text: 'Initial scale rules (floor, burst, signal)?',
+        inputType: 'compound',
+        isRequired: false,
+        isOptional: true,
+        isCompleted: false,
+        architectureImpact: 'important',
+        helpText: 'Capture launch-day autoscale guardrails so infra can wire minimum instances and burst limits correctly.',
+        infoPopover: {
+          title: 'Why define initial scale rules?',
+          description: 'Autoscale policies need a sensible floor during early traffic while allowing room to spike. Sharing these constraints guides SKU selection and readiness tasks.',
+          bullets: [
+            { label: 'Floor', text: 'Minimum warm instances to hide cold starts or meet SLOs.' },
+            { label: 'Burst', text: 'Hard ceiling before throttling or queuing kicks in.' },
+            { label: 'Signal', text: 'Primary trigger (CPU, queue length, concurrency) so scale rules align with telemetry.' }
+          ]
+        },
+        compoundFields: [
+          {
+            id: 'min-instances',
+            label: 'Min instances',
+            type: 'text',
+            placeholder: 'e.g., 2'
+          },
+          {
+            id: 'max-instances',
+            label: 'Burst max',
+            type: 'text',
+            placeholder: 'e.g., 10'
+          },
+          {
+            id: 'scale-signal',
+            label: 'Primary signal',
+            type: 'select',
+            options: ['CPU %', 'Memory %', 'Queue length', 'Requests in flight', 'Custom']
+          },
+          {
+            id: 'scale-threshold',
+            label: 'Target threshold',
+            type: 'text',
+            placeholder: 'e.g., 70% CPU or 200 msgs'
+          }
+        ]
+      },
+      {
         id: 'latency-targets',
         text: 'Latency targets for user experience?',
         inputType: 'latency-targets',
@@ -63,7 +108,16 @@ export const nfrSections: NFRSection[] = [
         isOptional: false,
         isCompleted: false,
         architectureImpact: 'critical',
-        helpText: 'Performance percentiles — P95 should be lower than P99',
+        helpText: 'Capture response-time SLOs in milliseconds so we can size front-door and compute tiers appropriately.',
+        infoPopover: {
+          title: 'What do P95 and P99 mean?',
+          description: 'Latency percentiles describe the slowest experiences a user should ever feel. They shape auto-scaling, caching, and regional placement strategies.',
+          bullets: [
+            { label: 'P95', text: '95% of requests finish within this time. Set it near the moment UX starts to feel sluggish.' },
+            { label: 'P99', text: 'Tail latency budget for the rarest slow paths. It must stay higher than P95 to absorb spikes.' },
+            { label: 'Tip', text: 'If your SLOs are in seconds, convert them (1 second = 1000 ms). Sub-1s goals are easier to reason about in milliseconds.' }
+          ]
+        },
         compoundFields: [
           {
             id: 'p95-value',
@@ -106,13 +160,33 @@ export const nfrSections: NFRSection[] = [
       {
         id: 'request-types',
         text: 'Are requests idempotent? Any long-polling or streaming?',
-        inputType: 'text',
+        inputType: 'multiselect-with-notes',
         isRequired: false,
         isOptional: true,
         isCompleted: false,
-        architectureImpact: 'nice-to-have',
-        placeholder: 'e.g., Mostly idempotent APIs, some WebSocket streaming',
-        helpText: 'Affects load balancing and connection management'
+        architectureImpact: 'important',
+        placeholder: 'Note unusual behaviors, retries, auth flows…',
+        helpText: 'Pick all workload behaviors; add notes for nuances. Drives load balancing, messaging, and compute choices.',
+        infoPopover: {
+          title: 'Request semantics cheat sheet',
+          description: 'The more we know about request behavior, the better we can size retry policies, choose messaging, and prevent double-processing.',
+          bullets: [
+            { label: 'Idempotent', text: 'Safe to retry (typical REST/CRUD) — supports aggressive retries and caching.' },
+            { label: 'Non-idempotent', text: 'Financial/side-effectful calls — steer toward transactional queues or sagas.' },
+            { label: 'Streaming', text: 'Long-lived connections alter networking and autoscale design.' }
+          ]
+        },
+        options: [
+          'Mostly idempotent REST/CRUD',
+          'Non-idempotent or transactional writes',
+          'Requires FIFO / strict ordering',
+          'Long-polling or Comet patterns',
+          'WebSocket or streaming connections',
+          'High fan-out events / pub-sub',
+          'Background jobs or queue workers',
+          'Batch or scheduled workloads'
+        ],
+        notesPlaceholder: 'Protocols, retry semantics, or anything quirky'
       }
     ]
   },
@@ -124,79 +198,52 @@ export const nfrSections: NFRSection[] = [
     isCollapsed: true,
     questions: [
       {
-        id: 'data-models',
-        text: 'Data models (add multiple if you have different data sources)',
-        inputType: 'card-list',
+        id: 'global-settings',
+        text: 'Global Defaults and Policies',
+        inputType: 'subheading',
+        isRequired: false,
+        isOptional: true,
+        isCompleted: true,
+        architectureImpact: 'important',
+        helpText: 'Global settings may prefill new data models or restrict specific choices.'
+      },
+      {
+        id: 'consistency-level',
+        text: 'Default consistency policy?',
+        inputType: 'select',
         isRequired: true,
         isOptional: false,
         isCompleted: false,
         architectureImpact: 'critical',
-        helpText: 'Each data model may require different database technologies',
-        cardConfig: {
-          addButtonText: 'Add Data Model',
-          cardTitle: 'Data Source',
-          maxCards: 5,
-          fields: [
-            {
-              id: 'name',
-              label: 'Data Source Name',
-              type: 'text',
-              placeholder: 'e.g., User profiles, Order history'
-            },
-            {
-              id: 'model-type',
-              label: 'Data Model',
-              type: 'select',
-              options: ['Relational (SQL)', 'Document (NoSQL)', 'Key-value', 'Time-series', 'Graph', 'Blob/File storage']
-            },
-            {
-              id: 'consistency',
-              label: 'Consistency Requirements',
-              type: 'select',
-              options: ['Strong (ACID)', 'Bounded-staleness', 'Session', 'Eventual']
-            },
-            {
-              id: 'size-estimate',
-              label: 'Size Estimate',
-              type: 'text',
-              placeholder: 'e.g., 100GB, 1TB'
-            }
-          ]
-        }
+        options: ['Strong', 'Bounded-staleness', 'Session', 'Eventual'],
+        helpText: 'Applies by default to data models; per-model overrides allowed.'
       },
       {
-        id: 'data-growth',
-        text: 'Data growth rate and retention',
-        inputType: 'compound',
-        isRequired: false,
-        isOptional: true,
+        id: 'read-write-ratio',
+        text: 'Read/write ratio (workload-wide)?',
+        inputType: 'percentage-split',
+        isRequired: true,
+        isOptional: false,
         isCompleted: false,
         architectureImpact: 'important',
-        helpText: 'Amount per period and overall retention help size storage and lifecycle policies',
-        compoundFields: [
-          { id: 'growth-amount', label: 'Growth Amount', type: 'text', placeholder: '100' },
-          { id: 'growth-unit', label: 'Unit', type: 'select', options: ['GB', 'TB', 'PB'] },
-          { id: 'growth-period', label: 'Per', type: 'select', options: ['month', 'quarter', 'year'] },
-          { id: 'retention-amount', label: 'Retention', type: 'text', placeholder: '7' },
-          { id: 'retention-unit', label: 'Unit', type: 'select', options: ['months', 'years'] }
-        ]
+        helpText: 'Percentages should total 100%. Used for defaults and recommendations.'
       },
       {
         id: 'data-storage-config',
-        text: 'Configure your primary data storage?',
+        text: 'Storage defaults (optional)',
         inputType: 'conditional-fieldset',
-        isRequired: true,
-        isOptional: false,
+        isRequired: false,
+        isOptional: true,
         isCompleted: false,
         architectureImpact: 'critical',
-        helpText: 'Smart configuration based on your data model choice',
+        helpText: 'Defaults based on your general storage preferences. Models can diverge as needed.',
         conditionalFields: [
           {
             id: 'storage-type',
             type: 'select',
             label: 'Primary Storage Type',
             options: ['Relational (SQL)', 'Document (NoSQL)', 'Key-value', 'Blob/File Storage', 'Time-series'],
-            required: true,
+            required: false,
             visible: true
           },
           {
@@ -204,7 +251,7 @@ export const nfrSections: NFRSection[] = [
             type: 'select',
             label: 'Consistency Requirements',
             options: ['Strong (ACID)', 'Bounded-staleness', 'Session', 'Eventual'],
-            required: true,
+            required: false,
             visible: false
           },
           {
@@ -245,91 +292,65 @@ export const nfrSections: NFRSection[] = [
           }
         ],
         conditionalRules: [
-          {
-            triggerField: 'storage-type',
-            triggerValue: 'Relational (SQL)',
-            action: 'show',
-            targetField: 'consistency-requirement'
-          },
-          {
-            triggerField: 'storage-type',
-            triggerValue: 'Relational (SQL)',
-            action: 'setValue',
-            targetField: 'consistency-requirement',
-            value: 'Strong (ACID)'
-          },
-          {
-            triggerField: 'storage-type',
-            triggerValue: 'Relational (SQL)',
-            action: 'show',
-            targetField: 'indexing-strategy'
-          },
-          {
-            triggerField: 'storage-type',
-            triggerValue: ['Document (NoSQL)', 'Key-value'],
-            action: 'show',
-            targetField: 'consistency-requirement'
-          },
-          {
-            triggerField: 'storage-type',
-            triggerValue: ['Document (NoSQL)', 'Key-value'],
-            action: 'show',
-            targetField: 'document-size'
-          },
-          {
-            triggerField: 'storage-type',
-            triggerValue: 'Blob/File Storage',
-            action: 'show',
-            targetField: 'file-size'
-          },
-          {
-            triggerField: 'storage-type',
-            triggerValue: 'Blob/File Storage',
-            action: 'setValue',
-            targetField: 'consistency-requirement',
-            value: 'Eventual'
-          },
-          {
-            triggerField: 'storage-type',
-            triggerValue: 'Blob/File Storage',
-            action: 'show',
-            targetField: 'access-pattern'
-          },
-          {
-            triggerField: 'storage-type',
-            triggerValue: 'Time-series',
-            action: 'setValue',
-            targetField: 'consistency-requirement',
-            value: 'Eventual'
-          },
-          {
-            triggerField: 'storage-type',
-            triggerValue: 'Time-series',
-            action: 'show',
-            targetField: 'access-pattern'
-          }
+          { triggerField: 'storage-type', triggerValue: 'Relational (SQL)', action: 'show', targetField: 'consistency-requirement' },
+          { triggerField: 'storage-type', triggerValue: 'Relational (SQL)', action: 'setValue', targetField: 'consistency-requirement', value: 'Strong (ACID)' },
+          { triggerField: 'storage-type', triggerValue: 'Relational (SQL)', action: 'show', targetField: 'indexing-strategy' },
+          { triggerField: 'storage-type', triggerValue: ['Document (NoSQL)', 'Key-value'], action: 'show', targetField: 'consistency-requirement' },
+          { triggerField: 'storage-type', triggerValue: ['Document (NoSQL)', 'Key-value'], action: 'show', targetField: 'document-size' },
+          { triggerField: 'storage-type', triggerValue: 'Blob/File Storage', action: 'show', targetField: 'file-size' },
+          { triggerField: 'storage-type', triggerValue: 'Blob/File Storage', action: 'setValue', targetField: 'consistency-requirement', value: 'Eventual' },
+          { triggerField: 'storage-type', triggerValue: 'Blob/File Storage', action: 'show', targetField: 'access-pattern' },
+          { triggerField: 'storage-type', triggerValue: 'Time-series', action: 'setValue', targetField: 'consistency-requirement', value: 'Eventual' },
+          { triggerField: 'storage-type', triggerValue: 'Time-series', action: 'show', targetField: 'access-pattern' }
         ]
       },
       {
-        id: 'consistency-level',
-        text: 'Required consistency?',
-        inputType: 'select',
+        id: 'models-subheading',
+        text: 'Data Models',
+        inputType: 'subheading',
+        isRequired: false,
+        isOptional: true,
+        isCompleted: true,
+        architectureImpact: 'important',
+        helpText: 'Define each distinct data source or dataset as a separate model.'
+      },
+      {
+        id: 'data-models',
+        text: 'Data models (add multiple if you have different data sources)',
+        inputType: 'card-list',
         isRequired: true,
         isOptional: false,
         isCompleted: false,
         architectureImpact: 'critical',
-        options: ['Strong', 'Bounded-staleness', 'Session', 'Eventual'],
-        helpText: 'Strong = ACID, Eventual = better performance/availability'
+        helpText: 'Each data model may require different database technologies',
+        cardConfig: {
+          addButtonText: 'Add Data Model',
+          cardTitle: 'Data Source',
+          maxCards: 5,
+          fields: [
+            { id: 'name', label: 'Data Source Name', type: 'text', placeholder: 'e.g., User profiles, Order history' },
+            { id: 'model-type', label: 'Data Model', type: 'select', options: ['Relational (SQL)', 'Document (NoSQL)', 'Key-value', 'Time-series', 'Graph', 'Blob/File storage'] },
+            { id: 'consistency', label: 'Consistency Requirements', type: 'select', options: ['Strong (ACID)', 'Bounded-staleness', 'Session', 'Eventual'] },
+            { id: 'size-estimate', label: 'Current Dataset Size', type: 'numeric-with-units', units: ['GB', 'TB'], defaultUnit: 'GB', placeholder: '100' }
+          ]
+        }
       },
       {
-        id: 'read-write-ratio',
-        text: 'Read/write ratio?',
-        inputType: 'percentage-split',
-        isRequired: true,
-        isOptional: false,
+        id: 'data-growth',
+        text: 'Data growth rate and retention',
+        inputType: 'compound',
+        isRequired: false,
+        isOptional: true,
         isCompleted: false,
         architectureImpact: 'important',
-        helpText: 'Percentages should total 100%'
+        helpText: 'Amount per period and overall retention help size storage and lifecycle policies',
+        compoundFields: [
+          { id: 'growth-amount', label: 'Growth Amount', type: 'text', placeholder: '100' },
+          { id: 'growth-unit', label: 'Unit', type: 'select', options: ['GB', 'TB', 'PB'] },
+          { id: 'growth-period', label: 'Per', type: 'select', options: ['month', 'quarter', 'year'] },
+          { id: 'retention-amount', label: 'Retention', type: 'text', placeholder: '7' },
+          { id: 'retention-unit', label: 'Unit', type: 'select', options: ['months', 'years'] }
+        ]
       },
       {
         id: 'item-size',

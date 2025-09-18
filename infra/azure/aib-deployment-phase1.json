@@ -1,0 +1,294 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "namePrefix": {
+      "type": "string",
+      "defaultValue": "aib"
+    },
+    "appShortName": {
+      "type": "string",
+      "defaultValue": "aib"
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "backendImage": {
+      "type": "string"
+    },
+    "frontendImage": {
+      "type": "string"
+    },
+    "githubToken": {
+      "type": "securestring",
+      "metadata": {
+        "description": "GitHub token for container registry access"
+      }
+    }
+  },
+  "variables": {
+    "storageAccountName": "[toLower(replace(concat(parameters('namePrefix'), 'sa', uniqueString(resourceGroup().id)), '-', ''))]",
+    "cosmosAccountName": "[concat(parameters('namePrefix'), '-cosmos')]",
+    "backendAppName": "[concat(parameters('namePrefix'), '-backend')]",
+    "frontendAppName": "[concat(parameters('namePrefix'), '-frontend')]",
+    "containerEnvName": "[concat(parameters('namePrefix'), '-cae')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[variables('storageAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "accessTier": "Hot",
+        "minimumTlsVersion": "TLS1_2"
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts",
+      "apiVersion": "2023-04-15",
+      "name": "[variables('cosmosAccountName')]",
+      "location": "[parameters('location')]",
+      "kind": "GlobalDocumentDB",
+      "properties": {
+        "databaseAccountOfferType": "Standard",
+        "capabilities": [
+          {
+            "name": "EnableServerless"
+          }
+        ],
+        "locations": [
+          {
+            "locationName": "[parameters('location')]",
+            "failoverPriority": 0
+          }
+        ],
+        "consistencyPolicy": {
+          "defaultConsistencyLevel": "Session"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosAccountName'), '/tapdb')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosAccountName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "tapdb"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosAccountName'), '/tapdb/projects')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('cosmosAccountName'), 'tapdb')]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "projects",
+          "partitionKey": {
+            "paths": ["/ownerId"],
+            "kind": "Hash"
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosAccountName'), '/tapdb/nfrAssessments')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('cosmosAccountName'), 'tapdb')]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "nfrAssessments",
+          "partitionKey": {
+            "paths": ["/projectId"],
+            "kind": "Hash"
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosAccountName'), '/tapdb/logs')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('cosmosAccountName'), 'tapdb')]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "logs",
+          "partitionKey": {
+            "paths": ["/projectId"],
+            "kind": "Hash"
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2023-05-01",
+      "name": "[variables('containerEnvName')]",
+      "location": "[parameters('location')]",
+      "properties": {}
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2023-05-01",
+      "name": "[variables('backendAppName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', variables('containerEnvName'))]"
+      ],
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', variables('containerEnvName'))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 5000
+          },
+          "registries": [
+            {
+              "server": "ghcr.io",
+              "username": "scottkollarik",
+              "passwordSecretRef": "github-token"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "github-token",
+              "value": "[parameters('githubToken')]"
+            }
+          ],
+          "activeRevisionsMode": "Single"
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "api",
+              "image": "[parameters('backendImage')]",
+              "probes": [
+                {
+                  "type": "liveness",
+                  "httpGet": {
+                    "path": "/health",
+                    "port": 5000
+                  },
+                  "initialDelaySeconds": 5
+                }
+              ],
+              "env": [
+                {
+                  "name": "PathBase",
+                  "value": "[concat('/', parameters('appShortName'))]"
+                },
+                {
+                  "name": "ASPNETCORE_ENVIRONMENT",
+                  "value": "Production"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": 0,
+            "maxReplicas": 2
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2023-05-01",
+      "name": "[variables('frontendAppName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', variables('containerEnvName'))]"
+      ],
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', variables('containerEnvName'))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 80
+          },
+          "registries": [
+            {
+              "server": "ghcr.io",
+              "username": "scottkollarik",
+              "passwordSecretRef": "github-token"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "github-token",
+              "value": "[parameters('githubToken')]"
+            }
+          ],
+          "activeRevisionsMode": "Single"
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "web",
+              "image": "[parameters('frontendImage')]",
+              "env": [
+                {
+                  "name": "VITE_BASE_PATH",
+                  "value": "[concat('/', parameters('appShortName'))]"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": 0,
+            "maxReplicas": 2
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "storageAccountName": {
+      "type": "string",
+      "value": "[variables('storageAccountName')]"
+    },
+    "cosmosAccountName": {
+      "type": "string",
+      "value": "[variables('cosmosAccountName')]"
+    },
+    "backendAppName": {
+      "type": "string",
+      "value": "[variables('backendAppName')]"
+    },
+    "frontendAppName": {
+      "type": "string",
+      "value": "[variables('frontendAppName')]"
+    },
+    "backendIdentity": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.App/containerApps', variables('backendAppName')), '2023-05-01', 'full').identity.principalId]"
+    },
+    "frontendIdentity": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.App/containerApps', variables('frontendAppName')), '2023-05-01', 'full').identity.principalId]"
+    }
+  }
+}

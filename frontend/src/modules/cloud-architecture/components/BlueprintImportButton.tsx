@@ -14,6 +14,7 @@ const BlueprintImportButton: React.FC<{ onImport: (c: ProjectConstraints) => Pro
         allowServiceIds: Array.isArray(json.allowServiceIds) ? json.allowServiceIds : undefined,
         denyServiceIds: Array.isArray(json.denyServiceIds) ? json.denyServiceIds : undefined,
         notes: typeof json.notes === 'string' ? json.notes : undefined,
+        nfrLocks: Array.isArray(json.nfrLocks) ? json.nfrLocks.filter((l: any) => typeof l?.path === 'string' && (l.mode === 'locked' || l.mode === 'policy-only')) : undefined,
       }
       await onImport(payload)
       alert('Blueprint imported. Constraints applied.')
@@ -32,4 +33,3 @@ const BlueprintImportButton: React.FC<{ onImport: (c: ProjectConstraints) => Pro
 }
 
 export default BlueprintImportButton
-

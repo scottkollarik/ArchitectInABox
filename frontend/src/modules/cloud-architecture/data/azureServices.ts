@@ -795,12 +795,28 @@ export const generateRecommendations = (nfrAssessment: any) => {
   } catch {}
 
   // Messaging & streaming
-  const reqTypes = String(nfrAssessment?.requestTypes || nfrAssessment?.request_types || nfrAssessment?.['request-types'] || '').toLowerCase()
+  const requestRaw = nfrAssessment?.requestTypes || nfrAssessment?.request_types || nfrAssessment?.['request-types']
+  let requestSelections: string[] = []
+  let requestNotes = ''
+  if (Array.isArray(requestRaw)) {
+    requestSelections = requestRaw
+  } else if (requestRaw && typeof requestRaw === 'object') {
+    requestSelections = Array.isArray(requestRaw.selections) ? requestRaw.selections : []
+    requestNotes = typeof requestRaw.notes === 'string' ? requestRaw.notes : ''
+  } else if (typeof requestRaw === 'string') {
+    requestNotes = requestRaw
+  }
+  const requestText = [...requestSelections, requestNotes].join(' ').toLowerCase()
   const expectedRps = parseInt(String(nfrAssessment?.expectedRps || nfrAssessment?.expected_rps || ''), 10)
-  if (reqTypes.includes('async') || reqTypes.includes('queue') || reqTypes.includes('event')) {
+
+  const hasQueueing = requestSelections.some(opt => /queue|background|batch/i.test(opt)) || requestText.includes('queue') || requestText.includes('async') || requestText.includes('worker')
+  const hasStreaming = requestSelections.some(opt => /stream|websocket|long-poll/i.test(opt)) || requestText.includes('stream') || requestText.includes('websocket') || requestText.includes('long-poll')
+  const hasEvents = requestSelections.some(opt => /fan-out|pub-sub/i.test(opt)) || requestText.includes('event') || requestText.includes('pubsub')
+
+  if (hasQueueing) {
     recommendations.push(getServiceById('service-bus'))
   }
-  if (reqTypes.includes('stream') || reqTypes.includes('kafka') || (!isNaN(expectedRps) && expectedRps > 5000)) {
+  if (hasStreaming || hasEvents || requestText.includes('kafka') || (!isNaN(expectedRps) && expectedRps > 5000)) {
     recommendations.push(getServiceById('event-hubs'))
   }
 
@@ -842,7 +858,7 @@ export const generateRecommendations = (nfrAssessment: any) => {
   } catch {}
 
   // API management
-  if (reqTypes.includes('api')) {
+  if (requestText.includes('api')) {
     recommendations.push(getServiceById('api-management'))
   }
   

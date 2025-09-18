@@ -1,0 +1,116 @@
+================================================================================
+AIB (Architect in a Box) - Deployment Setup Recap
+================================================================================
+
+WHAT'S BEEN ACCOMPLISHED
+========================
+
+1. Complete Operationalization Strategy
+   - Scale-to-zero Azure architecture: Container Apps + Cosmos DB Serverless + Blob Storage
+   - Cost-effective: ~$0 when idle, selective teardown preserves data
+   - Custom domain support: www.technologoo.com/aib ready
+
+2. Environment Management System
+   - Automated environment switching: scripts/env-switch.sh
+   - Multiple environments: docker-only, development, shared-cloud-dev, production
+   - Secure secrets handling: All production secrets gitignored
+
+3. GitHub Container Registry Setup - WORKING
+   - Authentication working: ghcr.io/scottkollarik
+   - Classic token created: write:packages permission
+   - Login successful: Ready to push containers
+
+4. Backend Compilation Issues - FIXED
+   - Added missing using: System.Security.Claims in EntraAuthExtensions.cs
+   - Removed duplicate import: MongoDB.Driver in Program.cs
+   - Updated vulnerable package: System.Text.Json 8.0.0 -> 8.0.5
+
+CURRENT STATUS: READY TO BUILD
+==============================
+
+All compilation errors resolved. Next command to run:
+
+./scripts/build-containers.sh ghcr.io/scottkollarik latest
+
+COMPLETE DEPLOYMENT SEQUENCE
+============================
+
+Step 1: Build & Push Containers
+./scripts/build-containers.sh ghcr.io/scottkollarik latest
+
+Creates: ghcr.io/scottkollarik/tap-backend:latest and ghcr.io/scottkollarik/tap-frontend:latest
+
+Step 2: Deploy Infrastructure (Bicep Creates Everything)
+./scripts/azure/deploy.sh my-rg eastus technologoo ghcr.io/scottkollarik/tap-backend:latest ghcr.io/scottkollarik/tap-frontend:latest
+
+Creates: Storage Account, Cosmos DB, Container Apps Environment, Container Apps
+
+Step 3: Setup Entra ID (After Deployment)
+./scripts/azure/setup-entra.sh "Architect in a Box" https://technologoo-frontend.eastus.azurecontainerapps.io
+
+Step 4: Configure Secrets
+Edit .env.production with connection strings from Step 2 + OAuth from Step 3
+./scripts/azure/configure-secrets.sh my-rg technologoo
+
+Step 5: Custom Domain (Optional)
+./scripts/azure/configure-custom-domain.sh my-rg technologoo www.technologoo.com
+
+KEY CONFIGURATION
+=================
+
+Your Settings:
+- GitHub Registry: ghcr.io/scottkollarik
+- Custom Domain: www.technologoo.com
+- App Name: "Architect in a Box"
+- App Short Name: aib
+
+Environment Files:
+Use quotes for spaces in .env files:
+APP_NAME="Architect in a Box"
+APP_SHORT_NAME=aib
+CUSTOM_DOMAIN=www.technologoo.com
+
+KEY FILES CREATED
+=================
+
+- Deployment scripts: scripts/azure/deploy.sh, teardown.sh, configure-secrets.sh
+- Environment management: scripts/env-switch.sh, dev-start.sh
+- Infrastructure as Code: infra/azure/main.bicep (creates all Azure resources)
+- OAuth integration: frontend/src/auth/*, backend/Auth/EntraAuthExtensions.cs
+- Environment templates: All .env.* files with secure secret handling
+
+NEXT IMMEDIATE ACTION
+====================
+
+Run the container build - all compilation issues are now fixed:
+
+./scripts/build-containers.sh ghcr.io/scottkollarik latest
+
+If successful, proceed with Azure deployment. You're literally one command away from having containers ready for deployment!
+
+SECURITY NOTES
+===============
+
+- GitHub token secured (previous exposed token was revoked)
+- All production secrets gitignored
+- Container registry authenticated
+- No hardcoded secrets in code
+
+STATUS: Ready to build containers and deploy to Azure!
+
+TROUBLESHOOTING NOTES
+=====================
+
+If container build fails again:
+1. Check Docker is running
+2. Verify GitHub Container Registry login: docker login ghcr.io
+3. Check backend builds locally: cd backend && dotnet build
+4. Check frontend builds locally: cd frontend && npm run build
+
+Common Issues:
+- Missing .env files (use templates)
+- Docker not authenticated to registry
+- Package restore issues (clear NuGet cache)
+- Path issues in Dockerfiles
+
+================================================================================

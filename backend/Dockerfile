@@ -1,3 +1,6 @@
+# Production build image
+# Build with: docker buildx build --platform linux/amd64 -f backend/Dockerfile -t <image> ./backend
+
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
 WORKDIR /app

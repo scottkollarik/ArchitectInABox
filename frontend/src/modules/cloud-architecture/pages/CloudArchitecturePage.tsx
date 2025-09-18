@@ -85,7 +85,8 @@ const CloudArchitecturePage: React.FC = () => {
       dataModel,
       readWriteRatio: find('read-write-ratio'),
       latencyTargets: find('latency-targets'),
-      networkPosture: find('network-posture')
+      networkPosture: find('network-posture'),
+      requestTypes: find('request-types')
     } as any
   }
 

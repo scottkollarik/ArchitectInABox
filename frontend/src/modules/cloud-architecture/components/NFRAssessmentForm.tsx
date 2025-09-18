@@ -8,7 +8,7 @@ import {
   TrashIcon
 } from '@heroicons/react/24/outline'
 import { nfrSections, getSectionCompletion, getOverallCompletion } from '../data/nfrData'
-import type { NFRSection, NFRQuestion } from '../types'
+import type { NFRSection, NFRQuestion, NFRFieldLock } from '../types'
 import { useProject } from '../../../context/ProjectContext'
 import NumericWithUnits from './inputs/NumericWithUnits'
 import PercentageSplit from './inputs/PercentageSplit'
@@ -17,11 +17,30 @@ import ConditionalFieldSet from './inputs/ConditionalFieldSet'
 import AzureRegionSelector from './inputs/AzureRegionSelector'
 import SizeRange, { type SizeRangeValue } from './inputs/SizeRange'
 import AvgPeakRps from './inputs/AvgPeakRps'
+import InfoTooltip from './inputs/InfoTooltip'
+import ExpectedRpsInput from './inputs/ExpectedRpsInput'
+import MultiSelectWithNotes from './inputs/MultiSelectWithNotes'
+import { nfrRecipes } from '../data/recipes'
+
+// Local helper: numeric-with-units parse for legacy strings
+const parseNumericWithUnit = (raw: any, defaultUnit: string) => {
+  if (raw && typeof raw === 'object' && ('value' in raw || 'unit' in raw)) {
+    const val = typeof raw.value === 'number' ? raw.value : (typeof raw.value === 'string' && /^\d+(?:\.\d+)?$/.test(raw.value) ? parseFloat(raw.value) : '')
+    return { value: val as any, unit: raw.unit || defaultUnit }
+  }
+  if (typeof raw === 'string') {
+    const m = raw.trim().match(/^(\d+(?:\.\d+)?)\s*([A-Za-z]+)$/)
+    if (m) return { value: parseFloat(m[1]), unit: m[2] }
+  }
+  return { value: '', unit: defaultUnit }
+}
 
 // Compute the best target id for the section/question label to reference
 const getQuestionLabelTargetId = (sectionId: string, question: NFRQuestion): string | undefined => {
   const base = `${sectionId}-${question.id}`
   switch (question.inputType) {
+    case 'subheading':
+      return undefined
     case 'text':
     case 'number':
     case 'select':
@@ -41,6 +60,7 @@ const getQuestionLabelTargetId = (sectionId: string, question: NFRQuestion): str
       return undefined
     case 'card-list':
     case 'multiselect':
+    case 'multiselect-with-notes':
     case 'conditional-fieldset':
     default:
       return undefined
@@ -50,6 +70,19 @@ const getQuestionLabelTargetId = (sectionId: string, question: NFRQuestion): str
 const NFRAssessmentForm: React.FC = () => {
   const { currentProject, updateProject } = useProject()
   const [sections, setSections] = useState<NFRSection[]>(nfrSections)
+  const nfrLocks = (currentProject?.constraints?.nfrLocks || []) as NFRFieldLock[]
+
+  const matchLock = (path: string): NFRFieldLock | undefined => {
+    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const toRegex = (p: string) => new RegExp('^' + esc(p).replace(/\\\\\[\\\\\]/g, '[^.]+' ) + '$')
+    // support [] marker: models[].consistency
+    const normalized = path
+    return nfrLocks.find(l => {
+      const pat = l.path.replace(/\[\]/g, '[^.]+' )
+      const re = new RegExp('^' + pat.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$')
+      return re.test(normalized)
+    })
+  }
 
   // Merge saved NFR with current schema so new input types render while preserving values
   const initializedRef = useRef<string | null>(null)
@@ -57,6 +90,17 @@ const NFRAssessmentForm: React.FC = () => {
     const merge = (saved: NFRSection[] | undefined, defs: NFRSection[]): NFRSection[] => {
       if (!saved || saved.length === 0) return defs
       const byId = new Map(saved.map(s => [s.id, s]))
+      const normalizeRequestTypes = (raw: any) => {
+        if (!raw) return undefined
+        if (Array.isArray(raw)) return { selections: raw.filter(Boolean), notes: '' }
+        if (typeof raw === 'object') {
+          const selections = Array.isArray(raw.selections) ? raw.selections.filter(Boolean) : []
+          const notes = typeof raw.notes === 'string' ? raw.notes : ''
+          return { selections, notes }
+        }
+        if (typeof raw === 'string') return { selections: [], notes: raw }
+        return undefined
+      }
       return defs.map(def => {
         const s = byId.get(def.id)
         if (!s) return def
@@ -72,7 +116,15 @@ const NFRAssessmentForm: React.FC = () => {
               if ((dq.id === 'transactions' || dq.id === 'search-analytics') && typeof sq.value === 'string' && dq.inputType === 'conditional-fieldset') {
                 useValue = { ...(dq.value || {}), notes: sq.value }
               }
+              if (dq.id === 'request-types' && dq.inputType === 'multiselect-with-notes') {
+                const normalized = normalizeRequestTypes(sq.value)
+                useValue = normalized ?? useValue
+              }
             }
+          }
+          if (dq.id === 'request-types' && dq.inputType === 'multiselect-with-notes') {
+            const normalized = normalizeRequestTypes(useValue)
+            if (normalized) useValue = normalized
           }
           const isCompleted = typeof sq?.isCompleted === 'boolean' ? sq.isCompleted : dq.isCompleted
           return { ...dq, value: useValue, isCompleted }
@@ -83,7 +135,31 @@ const NFRAssessmentForm: React.FC = () => {
     const projId = currentProject?.id || 'none'
     if (initializedRef.current === projId) return
     const next = merge(currentProject?.nfrAssessment as NFRSection[] | undefined, nfrSections)
-    setSections(next)
+    // Apply recipe defaults non-destructively (only when blank)
+    const recipeId = (currentProject?.profile as any)?.recipe as string | undefined
+    if (recipeId) {
+      const recipe = nfrRecipes.find(r => r.id === recipeId)
+      if (recipe) {
+        const withDefaults = next.map(section => ({
+          ...section,
+          questions: section.questions.map(q => {
+            const def = recipe.defaults[q.id]
+            if (def === undefined || def === null) return q
+            if (q.value !== undefined && q.value !== '' && q.isCompleted) return q
+            // For conditional-fieldset, merge objects
+            if (q.inputType === 'conditional-fieldset' && typeof def === 'object') {
+              return { ...q, value: { ...(q.value || {}), ...def } }
+            }
+            return { ...q, value: def }
+          })
+        }))
+        setSections(withDefaults)
+      } else {
+        setSections(next)
+      }
+    } else {
+      setSections(next)
+    }
     initializedRef.current = projId
   }, [currentProject?.id])
 
@@ -148,6 +224,32 @@ const NFRAssessmentForm: React.FC = () => {
     ))
   }, [])
 
+  const computeQuestionCompletion = useCallback((question: NFRQuestion, value: any) => {
+    switch (question.inputType) {
+      case 'multiselect':
+        return Array.isArray(value) && value.length > 0
+      case 'multiselect-with-notes': {
+        if (!value) return false
+        if (Array.isArray(value)) return value.length > 0
+        if (typeof value === 'object') {
+          const selections = Array.isArray(value.selections) ? value.selections.filter(Boolean) : []
+          const notes = typeof value.notes === 'string' ? value.notes.trim() : ''
+          return selections.length > 0 || notes.length > 0
+        }
+        if (typeof value === 'string') return value.trim().length > 0
+        return false
+      }
+      case 'latency-targets': {
+        if (!value) return false
+        const has95 = (typeof value.p95 === 'number' && !isNaN(value.p95)) || (typeof value.p95 === 'string' && value.p95.trim() !== '')
+        const has99 = (typeof value.p99 === 'number' && !isNaN(value.p99)) || (typeof value.p99 === 'string' && value.p99.trim() !== '')
+        return has95 || has99
+      }
+      default:
+        return value !== undefined && value !== null && value !== ''
+    }
+  }, [])
+
   const updateQuestion = useCallback((sectionId: string, questionId: string, value: any) => {
     setSections(prev => prev.map(section =>
       section.id === sectionId
@@ -155,13 +257,13 @@ const NFRAssessmentForm: React.FC = () => {
             ...section,
             questions: section.questions.map(question =>
               question.id === questionId
-                ? { ...question, value, isCompleted: !!value && value !== '' }
+                ? { ...question, value, isCompleted: computeQuestionCompletion(question, value) }
                 : question
             )
           }
         : section
     ))
-  }, [])
+  }, [computeQuestionCompletion])
 
   const updateCompoundField = useCallback((sectionId: string, questionId: string, fieldId: string, value: any) => {
     setSections(prev => prev.map(section =>
@@ -268,16 +370,193 @@ const NFRAssessmentForm: React.FC = () => {
     ))
   }, [])
 
+  // Inline component for card-list with composer UX
+  const CardListComposer: React.FC<{
+    sectionId: string
+    questionId: string
+    inputId: string
+    cards: any[]
+    fields: any[]
+    addButtonText?: string
+    cardTitle?: string
+    maxCards: number
+    defaults?: Record<string, any>
+  }> = ({ sectionId, questionId, inputId, cards, fields, addButtonText, cardTitle, maxCards, defaults = {} }) => {
+    const [draft, setDraft] = React.useState<Record<string, any>>(() => {
+      const init: Record<string, any> = {}
+      fields.forEach((f: any) => {
+        if (f.type === 'numeric-with-units') init[f.id] = { value: '', unit: f.defaultUnit || (f.units?.[0] || 'GB') }
+        else init[f.id] = (f.id === 'consistency' && defaults.consistency) ? defaults.consistency : ''
+      })
+      return init
+    })
+
+    const setDraftField = (id: string, val: any) => setDraft(prev => ({ ...prev, [id]: val }))
+
+    const handleAdd = () => {
+      const newCard = { ...draft }
+      setSections(prev => prev.map(section =>
+        section.id === sectionId
+          ? {
+              ...section,
+              questions: section.questions.map(q =>
+                q.id === questionId
+                  ? { ...q, value: [...(Array.isArray(q.value) ? q.value : []), newCard], isCompleted: true }
+                  : q
+              )
+            }
+          : section
+      ))
+      // reset draft
+      const reset: Record<string, any> = {}
+      fields.forEach((f: any) => {
+        if (f.type === 'numeric-with-units') reset[f.id] = { value: '', unit: f.defaultUnit || (f.units?.[0] || 'GB') }
+        else reset[f.id] = ''
+      })
+      setDraft(reset)
+    }
+
+    return (
+      <div className="mt-1 space-y-4">
+        {/* Existing Cards */}
+        {cards.map((card, cardIndex) => (
+          <div key={cardIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-medium text-gray-700">{cardTitle || 'Item'} {cardIndex + 1}</h4>
+              <button type="button" onClick={() => removeCard(sectionId, questionId, cardIndex)} className="text-red-600 hover:text-red-800 text-sm flex items-center space-x-1">
+                <TrashIcon className="h-4 w-4" />
+                <span>Remove</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {fields.map((field: any) => {
+                const fieldValue = card[field.id] || ''
+                const cardFieldInputId = `${inputId}-card-${cardIndex}-${field.id}`
+                const path = (field.id === 'consistency') ? `data.models.${cardIndex}.consistency` : ''
+                const lock = path ? matchLock(path) : undefined
+                const options = (field.options || []).filter((o: string) => !lock || lock.mode !== 'policy-only' || !lock.allowedValues?.length || lock.allowedValues.includes(o))
+                return (
+                  <div key={field.id}>
+                    <label htmlFor={cardFieldInputId} className="block text-xs font-medium text-gray-700 mb-1">{field.label}</label>
+                    {field.type === 'select' ? (
+                      <select
+                        id={cardFieldInputId}
+                        value={fieldValue}
+                        onChange={(e) => updateCardField(sectionId, questionId, cardIndex, field.id, e.target.value)}
+                        className="inline-block max-w-xs px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500"
+                        disabled={!!lock && lock.mode === 'locked'}
+                      >
+                        <option value="">Select...</option>
+                        {options.map((option: string) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    ) : field.type === 'numeric-with-units' ? (
+                      <NumericWithUnits
+                        id={cardFieldInputId}
+                        value={parseNumericWithUnit(fieldValue, field.defaultUnit || (field.units?.[0] || 'GB'))}
+                        onChange={(val) => updateCardField(sectionId, questionId, cardIndex, field.id, val)}
+                        units={field.units || ['units']}
+                        defaultUnit={field.defaultUnit}
+                      />
+                    ) : (
+                      <input
+                        id={cardFieldInputId}
+                        type={field.type}
+                        value={fieldValue}
+                        onChange={(e) => updateCardField(sectionId, questionId, cardIndex, field.id, e.target.value)}
+                        className="block max-w-xs px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500"
+                        placeholder={field.placeholder}
+                      />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+
+        {/* Composer for new card */}
+        {cards.length < maxCards ? (
+          <div className="border border-dashed border-gray-300 rounded-lg p-4">
+            <div className="text-sm font-medium text-gray-700 mb-2">{cardTitle || 'Item'} (new)</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {fields.map((field: any) => {
+                const fieldId = `${inputId}-composer-${field.id}`
+                const val = draft[field.id]
+                const path = (field.id === 'consistency') ? `data.models.new.consistency` : ''
+                const lock = path ? matchLock(path) : undefined
+                const options = (field.options || []).filter((o: string) => !lock || lock.mode !== 'policy-only' || !lock.allowedValues?.length || lock.allowedValues.includes(o))
+                return (
+                  <div key={field.id}>
+                    <label htmlFor={fieldId} className="block text-xs font-medium text-gray-700 mb-1">{field.label}</label>
+                    {field.type === 'select' ? (
+                      <select
+                        id={fieldId}
+                        value={val || ''}
+                        onChange={(e) => setDraftField(field.id, e.target.value)}
+                        className="inline-block max-w-xs px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500"
+                        disabled={!!lock && lock.mode === 'locked'}
+                      >
+                        <option value="">Select...</option>
+                        {options.map((option: string) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    ) : field.type === 'numeric-with-units' ? (
+                      <NumericWithUnits
+                        id={fieldId}
+                        value={val || { value: '', unit: field.defaultUnit || (field.units?.[0] || 'GB') }}
+                        onChange={(v) => setDraftField(field.id, v)}
+                        units={field.units || ['units']}
+                        defaultUnit={field.defaultUnit}
+                      />
+                    ) : (
+                      <input
+                        id={fieldId}
+                        type={field.type}
+                        value={val || ''}
+                        onChange={(e) => setDraftField(field.id, e.target.value)}
+                        className="block max-w-xs px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500"
+                        placeholder={field.placeholder}
+                      />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <div className="mt-3">
+              <button type="button" onClick={handleAdd} className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-azure-blue-600 text-white hover:bg-azure-blue-700">
+                {addButtonText || 'Add Item'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500 text-center">Maximum {maxCards} items reached</p>
+        )}
+      </div>
+    )
+  }
+
+
   const renderQuestion = (sectionId: string, question: NFRQuestion) => {
     const inputId = `${sectionId}-${question.id}`
 
     switch (question.inputType) {
+      case 'subheading':
+        return null
       case 'size-range': {
         const v = (question.value || {}) as any
+        const minUnit = (v.minUnit || v.unit || 'KB') as any
+        const maxUnit = (v.maxUnit || v.unit || 'KB') as any
         const norm: SizeRangeValue = {
           min: typeof v.min === 'number' ? v.min : '',
           max: typeof v.max === 'number' ? v.max : '',
-          unit: (v.unit || 'KB') as any,
+          minUnit,
+          maxUnit,
+          // keep legacy `unit` only when min/max match
+          unit: minUnit === maxUnit ? (minUnit as any) : undefined,
         }
         return (
           <div className="mt-1">
@@ -317,13 +596,23 @@ const NFRAssessmentForm: React.FC = () => {
           />
         )
       case 'text':
+        if (question.id === 'expected-rps') {
+          return (
+            <ExpectedRpsInput
+              id={inputId}
+              value={question.value}
+              onChange={(val) => updateQuestion(sectionId, question.id, val)}
+              className="mt-1"
+            />
+          )
+        }
         return (
           <input
             id={inputId}
             type="text"
             value={question.value || ''}
             onChange={(e) => updateQuestion(sectionId, question.id, e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+            className="mt-1 block px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm max-w-xs"
             placeholder={question.placeholder}
           />
         )
@@ -335,27 +624,31 @@ const NFRAssessmentForm: React.FC = () => {
             type="number"
             value={question.value || ''}
             onChange={(e) => updateQuestion(sectionId, question.id, e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+            className="mt-1 block px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm max-w-xs"
             placeholder={question.placeholder}
           />
         )
 
-      case 'select':
+      case 'select': {
+        // Apply blueprint locks only for known paths
+        let lock: NFRFieldLock | undefined
+        if (question.id === 'consistency-level') lock = matchLock('data.consistency-level')
+        const opts = (question.options || []).filter(o => !lock || lock.mode !== 'policy-only' || !lock.allowedValues || lock.allowedValues.includes(o))
         return (
           <select
             id={inputId}
             value={question.value || ''}
             onChange={(e) => updateQuestion(sectionId, question.id, e.target.value)}
-            className="mt-1 block px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm max-w-xs"
+            className="mt-1 inline-block px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm max-w-xs"
+            disabled={!!lock && lock.mode === 'locked'}
           >
             <option value="">Select an option...</option>
-            {question.options?.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
+            {opts.map((option) => (
+              <option key={option} value={option}>{option}</option>
             ))}
           </select>
         )
+      }
 
       case 'multiselect':
         return (
@@ -379,6 +672,20 @@ const NFRAssessmentForm: React.FC = () => {
             ))}
           </div>
         )
+
+      case 'multiselect-with-notes': {
+        const options = question.options || []
+        return (
+          <MultiSelectWithNotes
+            id={inputId}
+            options={options}
+            value={question.value}
+            onChange={(val) => updateQuestion(sectionId, question.id, val)}
+            notesPlaceholder={question.notesPlaceholder || question.placeholder}
+            className="mt-1"
+          />
+        )
+      }
 
       case 'compound':
         // Compact layout with validation for Avg/Peak RPS
@@ -491,88 +798,27 @@ const NFRAssessmentForm: React.FC = () => {
         )
 
       case 'card-list':
-        const cards = Array.isArray(question.value) ? question.value : []
+        // Backward-compatible normalization: accept arrays located under common keys
+        const rawCards: any = question.value
+        const cards = Array.isArray(rawCards)
+          ? rawCards
+          : (Array.isArray(rawCards?.items) ? rawCards.items : (Array.isArray(rawCards?.cards) ? rawCards.cards : []))
         const maxCards = question.cardConfig?.maxCards || 10
-        
+        const parentSection = sections.find(s => s.id === sectionId)
+        const globalConsistency = parentSection?.questions.find(q => q.id === 'consistency-level')?.value
+
         return (
-          <div className="mt-1 space-y-4">
-            {/* Existing Cards */}
-            {cards.map((card, cardIndex) => (
-              <div key={cardIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-medium text-gray-700">
-                    {question.cardConfig?.cardTitle || 'Item'} {cardIndex + 1}
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={() => removeCard(sectionId, question.id, cardIndex)}
-                    className="text-red-600 hover:text-red-800 text-sm flex items-center space-x-1"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                    <span>Remove</span>
-                  </button>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {question.cardConfig?.fields.map((field) => {
-                    const fieldValue = card[field.id] || ''
-                    const cardFieldInputId = `${inputId}-card-${cardIndex}-${field.id}`
-                    
-                    return (
-                      <div key={field.id}>
-                        <label htmlFor={cardFieldInputId} className="block text-xs font-medium text-gray-700 mb-1">
-                          {field.label}
-                        </label>
-                        
-                        {field.type === 'select' ? (
-                          <select
-                            id={cardFieldInputId}
-                            value={fieldValue}
-                            onChange={(e) => updateCardField(sectionId, question.id, cardIndex, field.id, e.target.value)}
-                            className="block w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500"
-                          >
-                            <option value="">Select...</option>
-                            {field.options?.map((option) => (
-                              <option key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            id={cardFieldInputId}
-                            type={field.type}
-                            value={fieldValue}
-                            onChange={(e) => updateCardField(sectionId, question.id, cardIndex, field.id, e.target.value)}
-                            className="block w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500"
-                            placeholder={field.placeholder}
-                          />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-            
-            {/* Add New Card Button */}
-            {cards.length < maxCards && (
-              <button
-                type="button"
-                onClick={() => addCard(sectionId, question.id)}
-                className="w-full py-3 px-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-azure-blue-400 hover:text-azure-blue-600 transition-colors flex items-center justify-center space-x-2"
-              >
-                <span className="text-lg">+</span>
-                <span>{question.cardConfig?.addButtonText || 'Add Item'}</span>
-              </button>
-            )}
-            
-            {cards.length >= maxCards && (
-              <p className="text-xs text-gray-500 text-center">
-                Maximum {maxCards} items reached
-              </p>
-            )}
-          </div>
+          <CardListComposer
+            sectionId={sectionId}
+            questionId={question.id}
+            inputId={inputId}
+            cards={cards}
+            fields={question.cardConfig?.fields || []}
+            addButtonText={question.cardConfig?.addButtonText}
+            cardTitle={question.cardConfig?.cardTitle}
+            maxCards={maxCards}
+            defaults={{ consistency: globalConsistency }}
+          />
         )
 
       case 'numeric-with-units':
@@ -726,25 +972,33 @@ const NFRAssessmentForm: React.FC = () => {
                   <div key={question.id} className="space-y-2">
                     {(() => {
                       const forId = getQuestionLabelTargetId(section.id, question)
-                      return forId ? (
-                        <label htmlFor={forId} className="block">
+                      const title = (
+                        <span className="inline-flex items-center gap-2">
                           <span className="text-sm font-medium text-gray-700">
                             {question.text}
                             {question.isRequired && <span className="text-red-500 ml-1">*</span>}
                           </span>
-                          {question.helpText && (
-                            <p className="text-xs text-gray-500 mt-1">{question.helpText}</p>
-                          )}
+                          {question.infoPopover ? (
+                            <InfoTooltip
+                              title={question.infoPopover.title}
+                              description={question.infoPopover.description}
+                              bullets={question.infoPopover.bullets}
+                            />
+                          ) : null}
+                        </span>
+                      )
+                      const helper = question.helpText ? (
+                        <p className="text-xs text-gray-500 mt-1">{question.helpText}</p>
+                      ) : null
+                      return forId ? (
+                        <label htmlFor={forId} className="block">
+                          {title}
+                          {helper}
                         </label>
                       ) : (
                         <div className="block">
-                          <span className="text-sm font-medium text-gray-700">
-                            {question.text}
-                            {question.isRequired && <span className="text-red-500 ml-1">*</span>}
-                          </span>
-                          {question.helpText && (
-                            <p className="text-xs text-gray-500 mt-1">{question.helpText}</p>
-                          )}
+                          {title}
+                          {helper}
                         </div>
                       )
                     })()}
