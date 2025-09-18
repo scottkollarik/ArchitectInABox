@@ -26,14 +26,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/ai-development', name: 'AI Development', icon: CpuChipIcon },
   ]
 
-  const isActivePath = (path: string) => {
-    return location.pathname === path || (path === '/cloud-architecture' && location.pathname === '/')
-  }
+  const isActivePath = (path: string) => location.pathname === path
 
   // Routes that render a joined strip under the nav; remove nav bottom border to weld
   const joinedRoutes = [
     '/cloud-architecture',
-    '/',
     '/inventory',
     '/api-development',
     '/frontend-development',
@@ -49,7 +46,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
-              <Link to="/" className="flex items-center space-x-3">
+              <Link to="/cloud-architecture" className="flex items-center space-x-3">
                 <CloudIcon className="w-8 h-8 text-white" />
                 <div className="min-w-0">
                   <h1 className="text-2xl font-bold text-white truncate">Architect in a Box</h1>

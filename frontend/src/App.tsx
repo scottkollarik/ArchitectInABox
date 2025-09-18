@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import { ProjectProvider } from './context/ProjectContext'
@@ -11,13 +11,14 @@ import SystemIntegrationPage from './modules/system-integration/pages/SystemInte
 import AIDevelopmentPage from './modules/ai-development/pages/AIDevelopmentPage'
 
 function App() {
+  const basename = import.meta.env.VITE_BASE_PATH || '/'
   return (
     <ProjectProvider>
       <DndProvider backend={HTML5Backend}>
-        <Router>
+        <Router basename={basename !== '/' ? basename : undefined}>
           <Layout>
             <Routes>
-              <Route path="/" element={<CloudArchitecturePage />} />
+              <Route path="/" element={<Navigate to="/cloud-architecture" replace />} />
               <Route path="/cloud-architecture" element={<CloudArchitecturePage />} />
               <Route path="/inventory" element={<InventoryPage />} />
               {/* Future routes */}
