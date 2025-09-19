@@ -28,6 +28,7 @@
 - Approval workflows for org projects (owner/contributor/reader + sign-off logic).
 
 ## Bugs / Known Issues
+- Avatar picker does not persist selection (localStorage update confirmed, but badge not refreshing).
 
 - Progress badges show 5% overall even when no project is selected; Data & Consistency badge mismatched (33% vs 0%).
 - Demo data sources appear in empty/no-project state (disable demo seed outside sandbox mode).
