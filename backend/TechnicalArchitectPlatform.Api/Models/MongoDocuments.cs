@@ -16,9 +16,19 @@ public class ProjectDocument
     public BsonDocument? Cloud { get; set; }
     public BsonDocument? BlueprintAssociation { get; set; }
     public BsonDocument? Constraints { get; set; }
+    [BsonElement("collaborators")]
+    public List<ProjectCollaboratorDocument> Collaborators { get; set; } = new();
     public int SchemaVersion { get; set; } = 1;
     public DateTime CreatedAt { get; set; }
     public DateTime LastModified { get; set; }
+}
+
+public class ProjectCollaboratorDocument
+{
+    public string PrincipalType { get; set; } = "user";
+    public string PrincipalId { get; set; } = default!;
+    public string Role { get; set; } = "reader";
+    public DateTime AddedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class NfrAssessmentDocument

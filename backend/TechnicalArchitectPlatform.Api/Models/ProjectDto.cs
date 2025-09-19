@@ -11,6 +11,7 @@ public record ProjectDto(
     ProjectCloudConfigDto? Cloud,
     BlueprintAssociationDto? BlueprintAssociation,
     ProjectConstraintsDto? Constraints,
+    ProjectCollaboratorDto[]? Collaborators,
     int SchemaVersion,
     DateTime CreatedAt,
     DateTime LastModified
@@ -49,3 +50,9 @@ public record NfrFieldLockDto(
     string[]? AllowedValues
 );
 
+public record ProjectCollaboratorDto(
+    string PrincipalType, // user | org
+    string PrincipalId,
+    string Role, // owner | contributor | reader
+    DateTime AddedAt
+);

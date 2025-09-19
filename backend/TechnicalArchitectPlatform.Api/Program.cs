@@ -4,6 +4,7 @@ using Azure.Storage.Blobs;
 using TechnicalArchitectPlatform.Api.Artifacts;
 using TechnicalArchitectPlatform.Api.Models;
 using TechnicalArchitectPlatform.Api.Vector;
+using System.Linq;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -131,12 +132,32 @@ IMongoDatabase GetDb(IMongoClient client)
     return client.GetDatabase("technical-architect-db");
 }
 
+FilterDefinition<ProjectDocument> BuildAccessFilter(string scope, string id)
+{
+    var ownerFilter = Builders<ProjectDocument>.Filter.And(
+        Builders<ProjectDocument>.Filter.Eq(x => x.OwnerScope, scope),
+        Builders<ProjectDocument>.Filter.Eq(x => x.OwnerId, id)
+    );
+    var collaboratorFilter = Builders<ProjectDocument>.Filter.ElemMatch(x => x.Collaborators,
+        c => c.PrincipalType == scope && c.PrincipalId == id);
+    return Builders<ProjectDocument>.Filter.Or(ownerFilter, collaboratorFilter);
+}
+
+bool HasOwnerAccess(ProjectDocument project, string scope, string id) =>
+    project.OwnerScope == scope && project.OwnerId == id;
+
+bool HasReadAccess(ProjectDocument project, string scope, string id)
+    => HasOwnerAccess(project, scope, id) || (project.Collaborators?.Any(c => c.PrincipalType == scope && c.PrincipalId == id) ?? false);
+
+bool HasWriteAccess(ProjectDocument project, string scope, string id)
+    => HasOwnerAccess(project, scope, id) || (project.Collaborators?.Any(c => c.PrincipalType == scope && c.PrincipalId == id && (c.Role == "owner" || c.Role == "contributor")) ?? false);
+
 // Projects API (upsert + list/get)
 api.MapGet("/projects", async (IMongoClient client, string ownerScope, string ownerId, CancellationToken ct) =>
 {
     var db = GetDb(client);
     var col = db.GetCollection<ProjectDocument>("projects");
-    var filter = Builders<ProjectDocument>.Filter.Eq(x => x.OwnerScope, ownerScope) & Builders<ProjectDocument>.Filter.Eq(x => x.OwnerId, ownerId);
+    var filter = BuildAccessFilter(ownerScope, ownerId);
     var list = await col.Find(filter).ToListAsync(ct);
     return Results.Ok(list);
 })
@@ -144,21 +165,28 @@ api.MapGet("/projects", async (IMongoClient client, string ownerScope, string ow
 .WithSummary("List projects by owner")
 .WithDescription("Returns projects for a given ownerScope and ownerId");
 
-api.MapGet("/projects/{id}", async (IMongoClient client, string id, CancellationToken ct) =>
+api.MapGet("/projects/{id}", async (IMongoClient client, string ownerScope, string ownerId, string id, CancellationToken ct) =>
 {
     var db = GetDb(client);
     var col = db.GetCollection<ProjectDocument>("projects");
     var doc = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
-    return doc is null ? Results.NotFound() : Results.Ok(doc);
+    if (doc is null) return Results.NotFound();
+    if (!HasReadAccess(doc, ownerScope, ownerId)) return Results.Forbid();
+    return Results.Ok(doc);
 })
 .WithName("GetProject")
 .WithSummary("Get a project by id");
 
-api.MapPost("/projects", async (IMongoClient client, ProjectDocument project, CancellationToken ct) =>
+api.MapPost("/projects", async (IMongoClient client, string ownerScope, string ownerId, ProjectDocument project, CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(project.Id)) return Results.BadRequest(new { message = "id required" });
     var db = GetDb(client);
     var col = db.GetCollection<ProjectDocument>("projects");
+    project.OwnerScope = ownerScope;
+    project.OwnerId = ownerId;
+    project.OrgId = project.OrgId;
+    project.Collaborators ??= new();
+    project.Collaborators.RemoveAll(c => c.PrincipalType == ownerScope && c.PrincipalId == ownerId); // owner implicit
     project.LastModified = project.LastModified == default ? DateTime.UtcNow : project.LastModified;
     project.CreatedAt = project.CreatedAt == default ? DateTime.UtcNow : project.CreatedAt;
     var res = await col.ReplaceOneAsync(x => x.Id == project.Id, project, new ReplaceOptions { IsUpsert = true }, ct);
@@ -167,11 +195,20 @@ api.MapPost("/projects", async (IMongoClient client, ProjectDocument project, Ca
 .WithName("UpsertProject")
 .WithSummary("Create or update a project by id");
 
-api.MapPut("/projects/{id}", async (IMongoClient client, string id, ProjectDocument project, CancellationToken ct) =>
+api.MapPut("/projects/{id}", async (IMongoClient client, string ownerScope, string ownerId, string id, ProjectDocument project, CancellationToken ct) =>
 {
     project.Id = id;
     var db = GetDb(client);
     var col = db.GetCollection<ProjectDocument>("projects");
+    var existing = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
+    if (existing is null) return Results.NotFound();
+    if (!HasOwnerAccess(existing, ownerScope, ownerId)) return Results.Forbid();
+    project.OwnerScope = existing.OwnerScope;
+    project.OwnerId = existing.OwnerId;
+    project.OrgId = existing.OrgId;
+    project.CreatedAt = existing.CreatedAt;
+    project.Collaborators ??= new();
+    project.Collaborators.RemoveAll(c => c.PrincipalType == project.OwnerScope && c.PrincipalId == project.OwnerId);
     project.LastModified = DateTime.UtcNow;
     var res = await col.ReplaceOneAsync(x => x.Id == id, project, new ReplaceOptions { IsUpsert = true }, ct);
     return Results.Ok(project);
@@ -180,20 +217,28 @@ api.MapPut("/projects/{id}", async (IMongoClient client, string id, ProjectDocum
 .WithSummary("Replace a project by id");
 
 // NFR API (get/put per project)
-api.MapGet("/projects/{projectId}/nfr", async (IMongoClient client, string projectId, CancellationToken ct) =>
+api.MapGet("/projects/{projectId}/nfr", async (IMongoClient client, string ownerScope, string ownerId, string projectId, CancellationToken ct) =>
 {
     var db = GetDb(client);
     var col = db.GetCollection<NfrAssessmentDocument>("nfrAssessments");
+    var projects = db.GetCollection<ProjectDocument>("projects");
+    var project = await projects.Find(x => x.Id == projectId).FirstOrDefaultAsync(ct);
+    if (project is null) return Results.NotFound();
+    if (!HasReadAccess(project, ownerScope, ownerId)) return Results.Forbid();
     var doc = await col.Find(x => x.ProjectId == projectId).FirstOrDefaultAsync(ct);
     return doc is null ? Results.NotFound() : Results.Ok(doc);
 })
 .WithName("GetProjectNfr")
 .WithSummary("Get NFR assessment for a project");
 
-api.MapPut("/projects/{projectId}/nfr", async (IMongoClient client, string projectId, NfrAssessmentDocument body, CancellationToken ct) =>
+api.MapPut("/projects/{projectId}/nfr", async (IMongoClient client, string ownerScope, string ownerId, string projectId, NfrAssessmentDocument body, CancellationToken ct) =>
 {
     var db = GetDb(client);
     var col = db.GetCollection<NfrAssessmentDocument>("nfrAssessments");
+    var projects = db.GetCollection<ProjectDocument>("projects");
+    var project = await projects.Find(x => x.Id == projectId).FirstOrDefaultAsync(ct);
+    if (project is null) return Results.NotFound();
+    if (!HasWriteAccess(project, ownerScope, ownerId)) return Results.Forbid();
     body.ProjectId = projectId;
     if (string.IsNullOrWhiteSpace(body.Id)) body.Id = projectId;
     body.LastModified = DateTime.UtcNow;
@@ -203,6 +248,69 @@ api.MapPut("/projects/{projectId}/nfr", async (IMongoClient client, string proje
 })
 .WithName("PutProjectNfr")
 .WithSummary("Upsert NFR assessment for a project");
+
+// Sharing endpoints
+record ProjectShareRequest(string PrincipalType, string PrincipalId, string Role);
+
+api.MapGet("/projects/{id}/shares", async (IMongoClient client, string ownerScope, string ownerId, string id, CancellationToken ct) =>
+{
+    var db = GetDb(client);
+    var col = db.GetCollection<ProjectDocument>("projects");
+    var project = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
+    if (project is null) return Results.NotFound();
+    if (!HasOwnerAccess(project, ownerScope, ownerId)) return Results.Forbid();
+    return Results.Ok(project.Collaborators ?? new());
+})
+.WithName("ListProjectShares")
+.WithSummary("List collaborators for a project");
+
+api.MapPost("/projects/{id}/shares", async (IMongoClient client, string ownerScope, string ownerId, string id, ProjectShareRequest request, CancellationToken ct) =>
+{
+    var db = GetDb(client);
+    var col = db.GetCollection<ProjectDocument>("projects");
+    var project = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
+    if (project is null) return Results.NotFound();
+    if (!HasOwnerAccess(project, ownerScope, ownerId)) return Results.Forbid();
+
+    if (request.PrincipalType == project.OwnerScope && request.PrincipalId == project.OwnerId)
+        return Results.BadRequest(new { message = "Owner already has full access" });
+
+    var allowedRoles = new[] { "owner", "contributor", "reader" };
+    if (!allowedRoles.Contains(request.Role))
+        return Results.BadRequest(new { message = "Invalid role" });
+
+    var collaborators = project.Collaborators ?? new();
+    collaborators.RemoveAll(c => c.PrincipalType == request.PrincipalType && c.PrincipalId == request.PrincipalId);
+    collaborators.Add(new ProjectCollaboratorDocument
+    {
+        PrincipalType = request.PrincipalType,
+        PrincipalId = request.PrincipalId,
+        Role = request.Role,
+        AddedAt = DateTime.UtcNow
+    });
+    project.Collaborators = collaborators;
+    project.LastModified = DateTime.UtcNow;
+    await col.ReplaceOneAsync(x => x.Id == id, project, new ReplaceOptions { IsUpsert = true }, ct);
+    return Results.Ok(project.Collaborators);
+})
+.WithName("UpsertProjectShare")
+.WithSummary("Add or update a collaborator on a project");
+
+api.MapDelete("/projects/{id}/shares/{principalId}", async (IMongoClient client, string ownerScope, string ownerId, string id, string principalId, CancellationToken ct) =>
+{
+    var db = GetDb(client);
+    var col = db.GetCollection<ProjectDocument>("projects");
+    var project = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
+    if (project is null) return Results.NotFound();
+    if (!HasOwnerAccess(project, ownerScope, ownerId)) return Results.Forbid();
+    project.Collaborators ??= new();
+    project.Collaborators.RemoveAll(c => c.PrincipalId == principalId);
+    project.LastModified = DateTime.UtcNow;
+    await col.ReplaceOneAsync(x => x.Id == id, project, new ReplaceOptions { IsUpsert = true }, ct);
+    return Results.NoContent();
+})
+.WithName("DeleteProjectShare")
+.WithSummary("Remove a collaborator from a project");
 
 // NFR endpoints (stubbed for now)
 api.MapGet("/nfr/questions", () =>

@@ -28,6 +28,11 @@ echo "======================================================"
 check_azure_cli
 load_environment
 
+if ! command -v jq >/dev/null 2>&1; then
+    echo "❌ 'jq' is required for Phase 6. Install it and retry."
+    exit 1
+fi
+
 # Check Phase 5 dependency
 if ! is_phase_completed "phase5_permissions"; then
     echo "❌ Phase 5 (permissions) must be completed first"
@@ -54,7 +59,13 @@ FRONTEND_FQDN=$(az containerapp show --resource-group "$RG_NAME" --name "${NAME_
 BACKEND_URL="https://$BACKEND_FQDN"
 FRONTEND_URL="https://$FRONTEND_FQDN"
 API_BASE_URL="$BACKEND_URL/$NAME_PREFIX/api"
-OAUTH_REDIRECT_URI="$FRONTEND_URL/$NAME_PREFIX/auth/callback"
+DEFAULT_OAUTH_REDIRECT_URI="$FRONTEND_URL/$NAME_PREFIX/auth/callback"
+CUSTOM_OAUTH_REDIRECT_URI="${VITE_OAUTH_REDIRECT_URI:-}" 
+if [[ -n "$CUSTOM_OAUTH_REDIRECT_URI" ]]; then
+    OAUTH_REDIRECT_URI="$CUSTOM_OAUTH_REDIRECT_URI"
+else
+    OAUTH_REDIRECT_URI="$DEFAULT_OAUTH_REDIRECT_URI"
+fi
 
 echo "🎯 Application URLs:"
 echo "   Frontend: $FRONTEND_URL"
@@ -99,13 +110,36 @@ if [[ "$DRY_RUN" == "false" ]]; then
     echo "ConnectionStrings__AzureBlob=\"$STORAGE_CONNECTION\""
     echo ""
     echo "# OAuth Configuration (set these with your Entra ID values)"
-    echo "VITE_OAUTH_CLIENT_ID=<your-client-id>"
-    echo "VITE_OAUTH_TENANT_ID=<your-tenant-id>"
+    echo "VITE_OAUTH_CLIENT_ID=${VITE_OAUTH_CLIENT_ID:-<your-client-id>}"
+    echo "VITE_OAUTH_TENANT_ID=${VITE_OAUTH_TENANT_ID:-<your-tenant-id>}"
     echo "EntraAuth__ClientId=<your-client-id>"
     echo "EntraAuth__TenantId=<your-tenant-id>"
     echo ""
 else
     echo "🔍 [DRY RUN] Would retrieve connection strings and display configuration summary"
+fi
+
+# Ensure Entra ID app registration has the redirect URI when details are available
+if [[ "$DRY_RUN" == "false" && -n "$VITE_OAUTH_CLIENT_ID" && -n "$OAUTH_REDIRECT_URI" ]]; then
+    echo "🔐 Ensuring Entra ID app registration has redirect URI: $OAUTH_REDIRECT_URI"
+    set +e
+    APP_URIS_JSON=$(az ad app show --id "$VITE_OAUTH_CLIENT_ID" --query 'web.redirectUris' -o json 2>/dev/null)
+    SHOW_STATUS=$?
+    set -e
+    if [[ $SHOW_STATUS -ne 0 || -z "$APP_URIS_JSON" ]]; then
+        echo "⚠️  Unable to retrieve existing redirect URIs for app $VITE_OAUTH_CLIENT_ID"
+    else
+        if echo "$APP_URIS_JSON" | jq -e --arg uri "$OAUTH_REDIRECT_URI" 'index($uri)' >/dev/null; then
+            echo "   ✅ Redirect URI already present."
+        else
+            echo "   ➕ Adding redirect URI to app registration..."
+            if az ad app update --id "$VITE_OAUTH_CLIENT_ID" --add web.redirectUris "$OAUTH_REDIRECT_URI" >/dev/null; then
+                echo "   ✅ Redirect URI added successfully."
+            else
+                echo "   ⚠️  Failed to add redirect URI. Verify permissions and retry manually."
+            fi
+        fi
+    fi
 fi
 
 # Display next steps

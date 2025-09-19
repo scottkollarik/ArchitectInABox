@@ -29,6 +29,9 @@ resource sa 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   properties: {
     accessTier: 'Hot'
     minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
+    allowBlobPublicAccess: false
+    publicNetworkAccess: 'Enabled'
   }
 }
 
@@ -236,4 +239,3 @@ output containerAppsFrontendUrl string = !empty(customDomain) ? customDomain : f
 output containerAppsFrontendDefaultUrl string = frontend.properties.configuration.ingress.fqdn
 output searchServiceName string = enableSearch ? search.name : 'disabled'
 output customDomainConfigured string = !empty(customDomain) ? 'true' : 'false'
-

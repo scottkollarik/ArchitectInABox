@@ -19,10 +19,15 @@ const msalInstance = new PublicClientApplication(msalConfig)
 interface AuthContextType {
   isAuthenticated: boolean
   user: AccountInfo | null
+  displayName: string | null
+  email: string | null
+  tenantId: string | null
+  objectId: string | null
   isLoading: boolean
   login: () => Promise<void>
   logout: () => Promise<void>
   getAccessToken: () => Promise<string | null>
+  getAuthHeaders: (extra?: HeadersInit) => Promise<HeadersInit>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -34,6 +39,10 @@ interface EntraAuthProviderProps {
 export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState<AccountInfo | null>(null)
+  const [displayName, setDisplayName] = useState<string | null>(null)
+  const [email, setEmail] = useState<string | null>(null)
+  const [tenantId, setTenantId] = useState<string | null>(null)
+  const [objectId, setObjectId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -43,16 +52,24 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
 
         // Handle redirect response
         const response = await msalInstance.handleRedirectPromise()
+        let activeAccount: AccountInfo | undefined
         if (response) {
-          setUser(response.account)
-          setIsAuthenticated(true)
+          activeAccount = response.account
         } else {
-          // Check if user is already signed in
           const accounts = msalInstance.getAllAccounts()
           if (accounts.length > 0) {
-            setUser(accounts[0])
-            setIsAuthenticated(true)
+            activeAccount = accounts[0]
           }
+        }
+        if (activeAccount) {
+          msalInstance.setActiveAccount(activeAccount)
+          setUser(activeAccount)
+          setIsAuthenticated(true)
+          const claims = activeAccount.idTokenClaims || {}
+          setDisplayName((claims['name'] as string) || activeAccount.name || activeAccount.username || null)
+          setEmail(activeAccount.username || (claims['preferred_username'] as string) || null)
+          setTenantId((claims['tid'] as string) || null)
+          setObjectId((claims['oid'] as string) || (activeAccount.homeAccountId?.split('.')[0] ?? null))
         }
       } catch (error) {
         console.error('MSAL initialization failed:', error)
@@ -127,13 +144,29 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
     }
   }
 
+  const getAuthHeaders = async (extra?: HeadersInit): Promise<HeadersInit> => {
+    const headers: HeadersInit = extra ? { ...(extra as any) } : {}
+    if (displayName) (headers as any)['X-User-Name'] = displayName
+    if (email) (headers as any)['X-User-Email'] = email
+    if (objectId) (headers as any)['X-User-Id'] = objectId
+    if (tenantId) (headers as any)['X-Tenant-Id'] = tenantId
+    const token = await getAccessToken()
+    if (token) (headers as any)['Authorization'] = `Bearer ${token}`
+    return headers
+  }
+
   const contextValue: AuthContextType = {
     isAuthenticated,
     user,
+    displayName,
+    email,
+    tenantId,
+    objectId,
     isLoading,
     login,
     logout,
     getAccessToken,
+    getAuthHeaders,
   }
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>

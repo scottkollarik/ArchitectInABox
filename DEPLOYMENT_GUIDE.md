@@ -83,6 +83,7 @@ VITE_OAUTH_REDIRECT_URI=https://www.technologoo.com/aib/auth/callback
 ./scripts/azure/phases/deploy-phase3-keyvault-wiring.sh
 
 # Phase 4: Deploy applications with private images
+# (ensure images are built for linux/amd64 and include Vite OAuth build args)
 ./scripts/azure/phases/deploy-phase4-applications.sh \
   ghcr.io/scottkollarik/tap-backend:latest \
   ghcr.io/scottkollarik/tap-frontend:latest
@@ -127,9 +128,9 @@ ConnectionStrings__AzureBlob="DefaultEndpointsProtocol=https;AccountName=aibsa12
 ```
 
 ### **Step 6: Update Entra ID Redirect URI**
+Phase 6 now attempts to add the redirect URI automatically when `VITE_OAUTH_CLIENT_ID` is set. If it fails (lack of permissions, etc.), run:
 ```bash
-# Update your existing Entra ID app with the redirect URI from Phase 6 output
-az ad app update --id [Your Client ID] --web-redirect-uris "https://your-frontend-url/aib/auth/callback"
+az ad app update --id [Your Client ID] --add web.redirectUris "https://your-frontend-url/aib/auth/callback"
 ```
 
 ### **Step 7: Test Your Deployment**

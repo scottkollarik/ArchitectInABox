@@ -4,9 +4,11 @@ import AzureRegionSelector from '../modules/cloud-architecture/components/inputs
 import BlueprintImportButton from '../modules/cloud-architecture/components/BlueprintImportButton'
 import { nfrRecipes } from '../modules/cloud-architecture/data/recipes'
 import CopyableNotice from './CopyableNotice'
+import { useAuth } from '../auth/EntraAuthProvider'
 
 const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const { currentProject, updateProject } = useProject()
+  const { getAuthHeaders, objectId, email } = useAuth()
   const [cloudFamily, setCloudFamily] = useState<'public' | 'gov'>('public')
   const [regionSelection, setRegionSelection] = useState<any>({})
   const [residencyPolicy, setResidencyPolicy] = useState<'no-restriction'|'in-country'|'in-geo'|'custom'>('no-restriction')
@@ -210,12 +212,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                     try {
                       setMigrationStatus('idle'); setMigrationMessage(''); setMigrationDetails('')
                       const apiBase = (import.meta as any).env?.VITE_API_URL || ''
-                      // Simulate your user identity for migration
-                      const userHeaders: HeadersInit = {
-                        'X-User-Id': 'scott.kollarik@gmail.com',
-                        'X-User-Email': 'scott.kollarik@gmail.com',
-                        'X-User-Name': 'Scott Kollarik'
-                      }
+                      const userHeaders = await getAuthHeaders()
                       const meRes = await fetch(`${apiBase}/api/me`, { headers: userHeaders })
                       if (!meRes.ok) throw new Error('Failed to resolve user')
                       const me = await meRes.json()
@@ -239,7 +236,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                         const projectDto = {
                           id: p.id,
                           ownerScope: 'user',
-                          ownerId: me.id || me.email || 'dev-user-1',
+                          ownerId: me.id || objectId || me.email || email || 'dev-user-1',
                           orgId: null,
                           name: p.name,
                           description: p.description || null,

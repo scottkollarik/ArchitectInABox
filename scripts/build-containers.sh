@@ -57,10 +57,13 @@ echo "✅ Backend image built: ${REGISTRY}/tap-backend:${TAG}"
 # Build frontend image
 echo "🌐 Building frontend image..."
 docker buildx build \
-  --platform "$PLATFORM" \
+  --platform "${PLATFORM:-linux/amd64}" \
   -f frontend/Dockerfile \
   --build-arg VITE_API_URL="${VITE_API_URL:-/aib/api}" \
   --build-arg VITE_BASE_PATH="${VITE_BASE_PATH:-/aib}" \
+  --build-arg VITE_OAUTH_CLIENT_ID="${VITE_OAUTH_CLIENT_ID:-}" \
+  --build-arg VITE_OAUTH_TENANT_ID="${VITE_OAUTH_TENANT_ID:-}" \
+  --build-arg VITE_OAUTH_REDIRECT_URI="${VITE_OAUTH_REDIRECT_URI:-}" \
   -t "${REGISTRY}/tap-frontend:${TAG}" \
   frontend \
   "${FRONTEND_OUTPUT[@]}"
