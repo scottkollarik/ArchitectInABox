@@ -6,6 +6,8 @@ declare global {
     readonly VITE_OAUTH_TENANT_ID?: string
     readonly VITE_OAUTH_REDIRECT_URI?: string
     readonly VITE_API_URL?: string
+    readonly VITE_BASE_PATH?: string
+    readonly VITE_ENABLE_ENTRA_AUTH?: string
   }
 
   interface ImportMeta {

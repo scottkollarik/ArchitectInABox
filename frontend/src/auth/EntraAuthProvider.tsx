@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { PublicClientApplication, Configuration, AccountInfo, RedirectRequest, SilentRequest } from '@azure/msal-browser'
 
+const authEnabled = (import.meta.env.VITE_ENABLE_ENTRA_AUTH ?? 'true').toLowerCase() !== 'false'
+
 const msalConfig: Configuration = {
   auth: {
     clientId: import.meta.env.VITE_OAUTH_CLIENT_ID || '',
@@ -14,7 +16,7 @@ const msalConfig: Configuration = {
   },
 }
 
-const msalInstance = new PublicClientApplication(msalConfig)
+const msalInstance: PublicClientApplication | null = authEnabled ? new PublicClientApplication(msalConfig) : null
 
 interface AuthContextType {
   isAuthenticated: boolean
@@ -46,11 +48,26 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const initializeMsal = async () => {
+    const initialize = async () => {
+      if (!authEnabled) {
+        setUser(null)
+        setDisplayName('Dev User')
+        setEmail('dev.user@example.com')
+        setTenantId('dev-tenant')
+        setObjectId('dev-user-1')
+        setIsAuthenticated(true)
+        setIsLoading(false)
+        return
+      }
+
+      if (!msalInstance) {
+        setIsLoading(false)
+        return
+      }
+
       try {
         await msalInstance.initialize()
 
-        // Handle redirect response
         const response = await msalInstance.handleRedirectPromise()
         let activeAccount: AccountInfo | undefined
         if (response) {
@@ -78,10 +95,14 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
       }
     }
 
-    initializeMsal()
+    initialize()
   }, [])
 
   const login = async () => {
+    if (!authEnabled) {
+      setIsAuthenticated(true)
+      return
+    }
     const loginRequest: RedirectRequest = {
       scopes: [
         'openid',
@@ -94,6 +115,8 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
       prompt: 'select_account',
     }
 
+    if (!msalInstance) return
+
     try {
       setIsLoading(true)
       await msalInstance.loginRedirect(loginRequest)
@@ -104,6 +127,16 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
   }
 
   const logout = async () => {
+    if (!authEnabled) {
+      setIsAuthenticated(false)
+      setUser(null)
+      return
+    }
+    if (!msalInstance) {
+      setIsLoading(false)
+      return
+    }
+
     try {
       setIsLoading(true)
       await msalInstance.logoutRedirect({
@@ -116,7 +149,8 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
   }
 
   const getAccessToken = async (): Promise<string | null> => {
-    if (!user) return null
+    if (!authEnabled) return null
+    if (!user || !msalInstance) return null
 
     const silentRequest: SilentRequest = {
       scopes: [

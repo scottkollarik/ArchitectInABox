@@ -9,6 +9,7 @@ import {
   CircleStackIcon
 } from '@heroicons/react/24/outline'
 import ProjectHeader from './ProjectHeader'
+import UserBadge from './UserBadge'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -19,11 +20,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const navigationItems = [
     { path: '/cloud-architecture', name: 'Cloud Architecture', icon: CloudIcon },
-    { path: '/inventory', name: 'Inventory', icon: CircleStackIcon },
     { path: '/api-development', name: 'API Development', icon: CodeBracketIcon },
     { path: '/frontend-development', name: 'Frontend', icon: DevicePhoneMobileIcon },
     { path: '/system-integration', name: 'Integration', icon: Cog6ToothIcon },
     { path: '/ai-development', name: 'AI Development', icon: CpuChipIcon },
+    { path: '/inventory', name: 'Inventory', icon: CircleStackIcon },
   ]
 
   const isActivePath = (path: string) => location.pathname === path
@@ -44,7 +45,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Header */}
       <header className="bg-gradient-to-r from-azure-blue-600 to-azure-blue-700 shadow-lg">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3 min-w-0">
               <Link to="/cloud-architecture" className="flex items-center space-x-3">
                 <CloudIcon className="w-8 h-8 text-white" />
@@ -54,9 +55,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </div>
               </Link>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="hidden md:block text-azure-blue-100 text-sm">MVP Version 1.0</div>
-              <ProjectHeader compact />
+            <div className="flex items-center justify-between gap-3 md:justify-end">
+              <div className="text-azure-blue-100 text-sm hidden md:block">MVP Version 1.0</div>
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="flex-1 sm:flex-initial">
+                  <ProjectHeader compact />
+                </div>
+                <UserBadge />
+              </div>
             </div>
           </div>
         </div>

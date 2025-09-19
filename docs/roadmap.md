@@ -37,4 +37,5 @@
 _Last updated: 2025-09-19_
 
 ## Implementation Progress
+- Header now shows user badge with fun avatar picker; layout responsive tweaks move project selector below title on mobile.
 - Frontend now uses Entra auth headers (`getAuthHeaders`) for backend migration flow; tokens + X-User-* come from MSAL.

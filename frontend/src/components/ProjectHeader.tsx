@@ -46,11 +46,11 @@ const ProjectHeader: React.FC<{ compact?: boolean }> = ({ compact = false }) => 
   // Compact rendering for top header integration
   if (compact) {
     return (
-      <div className="relative flex items-center">
+      <div className="relative flex items-center w-full sm:w-auto">
         {/* Selector button */}
         <button
           onClick={() => setShowProjectMenu(!showProjectMenu)}
-          className="flex items-center space-x-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded border border-white/30"
+          className="flex items-center space-x-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded border border-white/30 w-full sm:w-auto"
           title={currentProject ? currentProject.name : 'Select project'}
         >
           <FolderIcon className="w-4 h-4" />
@@ -70,7 +70,7 @@ const ProjectHeader: React.FC<{ compact?: boolean }> = ({ compact = false }) => 
 
         {/* Dropdown */}
         {showProjectMenu && (
-          <div className="absolute right-0 top-full mt-2 w-96 bg-white border border-architect-gray-200 rounded-lg shadow-lg z-50">
+          <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-2 w-80 sm:w-96 bg-white border border-architect-gray-200 rounded-lg shadow-lg z-50">
             <div className="p-3 border-b border-architect-gray-100 flex items-center justify-between">
               <h3 className="font-semibold text-architect-gray-900">Projects</h3>
               <button
