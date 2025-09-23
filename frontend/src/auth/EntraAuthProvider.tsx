@@ -29,7 +29,7 @@ interface AuthContextType {
   login: () => Promise<void>
   logout: () => Promise<void>
   getAccessToken: () => Promise<string | null>
-  getAuthHeaders: (extra?: HeadersInit) => Promise<HeadersInit>
+  isAuthEnabled: boolean
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -101,6 +101,7 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
   const login = async () => {
     if (!authEnabled) {
       setIsAuthenticated(true)
+
       return
     }
     const loginRequest: RedirectRequest = {
@@ -178,17 +179,6 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
     }
   }
 
-  const getAuthHeaders = async (extra?: HeadersInit): Promise<HeadersInit> => {
-    const headers: HeadersInit = extra ? { ...(extra as any) } : {}
-    if (displayName) (headers as any)['X-User-Name'] = displayName
-    if (email) (headers as any)['X-User-Email'] = email
-    if (objectId) (headers as any)['X-User-Id'] = objectId
-    if (tenantId) (headers as any)['X-Tenant-Id'] = tenantId
-    const token = await getAccessToken()
-    if (token) (headers as any)['Authorization'] = `Bearer ${token}`
-    return headers
-  }
-
   const contextValue: AuthContextType = {
     isAuthenticated,
     user,
@@ -200,7 +190,7 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
     login,
     logout,
     getAccessToken,
-    getAuthHeaders,
+    isAuthEnabled: authEnabled,
   }
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>

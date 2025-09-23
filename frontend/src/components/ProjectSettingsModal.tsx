@@ -5,10 +5,11 @@ import BlueprintImportButton from '../modules/cloud-architecture/components/Blue
 import { nfrRecipes } from '../modules/cloud-architecture/data/recipes'
 import CopyableNotice from './CopyableNotice'
 import { useAuth } from '../auth/EntraAuthProvider'
+import { buildAuthHeaders, getApiBase } from '../utils/apiClient'
 
 const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const { currentProject, updateProject } = useProject()
-  const { getAuthHeaders, objectId, email } = useAuth()
+  const auth = useAuth()
   const [cloudFamily, setCloudFamily] = useState<'public' | 'gov'>('public')
   const [regionSelection, setRegionSelection] = useState<any>({})
   const [residencyPolicy, setResidencyPolicy] = useState<'no-restriction'|'in-country'|'in-geo'|'custom'>('no-restriction')
@@ -211,9 +212,9 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                   onClick={async () => {
                     try {
                       setMigrationStatus('idle'); setMigrationMessage(''); setMigrationDetails('')
-                      const apiBase = (import.meta as any).env?.VITE_API_URL || ''
-                      const userHeaders = await getAuthHeaders()
-                      const meRes = await fetch(`${apiBase}/api/me`, { headers: userHeaders })
+                      const apiBase = getApiBase()
+                      const meHeaders = await buildAuthHeaders(auth)
+                      const meRes = await fetch(`${apiBase}/api/me`, { headers: meHeaders })
                       if (!meRes.ok) throw new Error('Failed to resolve user')
                       const me = await meRes.json()
                       const raw = localStorage.getItem('architect-projects')
@@ -236,7 +237,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                         const projectDto = {
                           id: p.id,
                           ownerScope: 'user',
-                          ownerId: me.id || objectId || me.email || email || 'dev-user-1',
+                          ownerId: me.id || auth.objectId || me.email || auth.email || 'dev-user-1',
                           orgId: null,
                           name: p.name,
                           description: p.description || null,
@@ -250,7 +251,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                         }
                         const upsert = await fetch(`${apiBase}/api/projects`, {
                           method: 'POST',
-                          headers: { 'Content-Type': 'application/json', ...(userHeaders as any) },
+                          headers: await buildAuthHeaders(auth, { 'Content-Type': 'application/json' }),
                           body: JSON.stringify(projectDto)
                         })
                         if (!upsert.ok) {
@@ -269,7 +270,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                         }
                         const putNfr = await fetch(`${apiBase}/api/projects/${encodeURIComponent(p.id)}/nfr`, {
                           method: 'PUT',
-                          headers: { 'Content-Type': 'application/json', ...(userHeaders as any) },
+                          headers: await buildAuthHeaders(auth, { 'Content-Type': 'application/json' }),
                           body: JSON.stringify(nfrBody)
                         })
                         if (!putNfr.ok) {

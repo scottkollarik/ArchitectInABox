@@ -5,10 +5,18 @@ using TechnicalArchitectPlatform.Api.Artifacts;
 using TechnicalArchitectPlatform.Api.Models;
 using TechnicalArchitectPlatform.Api.Vector;
 using System.Linq;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
+using TechnicalArchitectPlatform.Api.Auth;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var authClientId = builder.Configuration["EntraAuth:ClientId"] ?? Environment.GetEnvironmentVariable("VITE_OAUTH_CLIENT_ID");
+var authTenantId = builder.Configuration["EntraAuth:TenantId"] ?? Environment.GetEnvironmentVariable("VITE_OAUTH_TENANT_ID");
+var authEnabled = !string.IsNullOrWhiteSpace(authClientId) && !string.IsNullOrWhiteSpace(authTenantId);
+
+if (!string.IsNullOrWhiteSpace(authClientId)) builder.Configuration["EntraAuth:ClientId"] = authClientId;
+if (!string.IsNullOrWhiteSpace(authTenantId)) builder.Configuration["EntraAuth:TenantId"] = authTenantId;
+
+builder.Services.AddEntraAuth(builder.Configuration);
 
 // Add services to the container
 builder.Services.AddEndpointsApiExplorer();
@@ -74,6 +82,8 @@ if (!string.IsNullOrWhiteSpace(pathBase))
     app.UsePathBase(pathBase);
 }
 
+app.UseEntraAuth();
+
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
@@ -104,22 +114,13 @@ app.MapGet("/health", () =>
 // API endpoints group
 var api = app.MapGroup("/api").WithOpenApi();
 
-// Dev user info (simulate OAuth) — reads headers if present, else returns a default dev user
-api.MapGet("/me", (HttpRequest req) =>
+if (authEnabled)
 {
-    var id = req.Headers["X-User-Id"].FirstOrDefault() ?? "dev-user-1";
-    var email = req.Headers["X-User-Email"].FirstOrDefault() ?? "dev.user@example.com";
-    var name = req.Headers["X-User-Name"].FirstOrDefault() ?? "Dev User";
-    var tenant = req.Headers["X-Tenant-Id"].FirstOrDefault();
-    return Results.Ok(new TechnicalArchitectPlatform.Api.Models.UserDto(
-        Id: id,
-        Provider: "dev",
-        Subject: id,
-        Email: email,
-        DisplayName: name,
-        TenantId: tenant
-    ));
-})
+    api.RequireAuthorization("RequireAuthenticatedUser");
+}
+
+// Dev user info (simulate OAuth) — reads headers if present, else returns a default dev user
+api.MapGet("/me", (HttpContext ctx) => Results.Ok(ResolveUser(ctx))).AllowAnonymous()
 .WithName("GetMe")
 .WithSummary("Get current user (dev)")
 .WithDescription("Development-only user info via headers (X-User-*) or defaults");
@@ -152,41 +153,65 @@ bool HasReadAccess(ProjectDocument project, string scope, string id)
 bool HasWriteAccess(ProjectDocument project, string scope, string id)
     => HasOwnerAccess(project, scope, id) || (project.Collaborators?.Any(c => c.PrincipalType == scope && c.PrincipalId == id && (c.Role == "owner" || c.Role == "contributor")) ?? false);
 
+UserInfo ResolveUser(HttpContext ctx)
+{
+    if (authEnabled && ctx.User.IsAuthenticated())
+    {
+        return ctx.User.GetUserInfo();
+    }
+
+    var id = ctx.Request.Headers["X-User-Id"].FirstOrDefault()
+             ?? ctx.Request.Query["ownerId"].FirstOrDefault()
+             ?? "dev-user-1";
+    var email = ctx.Request.Headers["X-User-Email"].FirstOrDefault()
+                ?? ctx.Request.Query["ownerEmail"].FirstOrDefault()
+                ?? (ctx.Request.Headers["X-User-Id"].FirstOrDefault() ?? "dev.user") + "@example.com";
+    var name = ctx.Request.Headers["X-User-Name"].FirstOrDefault()
+               ?? ctx.Request.Query["ownerName"].FirstOrDefault()
+               ?? "Dev User";
+    return new UserInfo(id, email, name, false);
+}
+
 // Projects API (upsert + list/get)
-api.MapGet("/projects", async (IMongoClient client, string ownerScope, string ownerId, CancellationToken ct) =>
+api.MapGet("/projects", async (IMongoClient client, HttpContext ctx, CancellationToken ct) =>
 {
     var db = GetDb(client);
     var col = db.GetCollection<ProjectDocument>("projects");
+    var userInfo = ResolveUser(ctx);
+    const string ownerScope = "user";
+    var ownerId = userInfo.Id;
     var filter = BuildAccessFilter(ownerScope, ownerId);
     var list = await col.Find(filter).ToListAsync(ct);
     return Results.Ok(list);
 })
 .WithName("ListProjects")
 .WithSummary("List projects by owner")
-.WithDescription("Returns projects for a given ownerScope and ownerId");
+.WithDescription("Returns projects visible to the current user");
 
-api.MapGet("/projects/{id}", async (IMongoClient client, string ownerScope, string ownerId, string id, CancellationToken ct) =>
+api.MapGet("/projects/{id}", async (IMongoClient client, HttpContext ctx, string id, CancellationToken ct) =>
 {
     var db = GetDb(client);
     var col = db.GetCollection<ProjectDocument>("projects");
     var doc = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
     if (doc is null) return Results.NotFound();
-    if (!HasReadAccess(doc, ownerScope, ownerId)) return Results.Forbid();
+    var userInfo = ResolveUser(ctx);
+    if (!HasReadAccess(doc, "user", userInfo.Id)) return Results.Forbid();
     return Results.Ok(doc);
 })
 .WithName("GetProject")
 .WithSummary("Get a project by id");
 
-api.MapPost("/projects", async (IMongoClient client, string ownerScope, string ownerId, ProjectDocument project, CancellationToken ct) =>
+api.MapPost("/projects", async (IMongoClient client, HttpContext ctx, ProjectDocument project, CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(project.Id)) return Results.BadRequest(new { message = "id required" });
     var db = GetDb(client);
     var col = db.GetCollection<ProjectDocument>("projects");
-    project.OwnerScope = ownerScope;
-    project.OwnerId = ownerId;
+    var userInfo = ResolveUser(ctx);
+    project.OwnerScope = "user";
+    project.OwnerId = userInfo.Id;
     project.OrgId = project.OrgId;
     project.Collaborators ??= new();
-    project.Collaborators.RemoveAll(c => c.PrincipalType == ownerScope && c.PrincipalId == ownerId); // owner implicit
+    project.Collaborators.RemoveAll(c => c.PrincipalType == "user" && c.PrincipalId == userInfo.Id); // owner implicit
     project.LastModified = project.LastModified == default ? DateTime.UtcNow : project.LastModified;
     project.CreatedAt = project.CreatedAt == default ? DateTime.UtcNow : project.CreatedAt;
     var res = await col.ReplaceOneAsync(x => x.Id == project.Id, project, new ReplaceOptions { IsUpsert = true }, ct);
@@ -195,14 +220,15 @@ api.MapPost("/projects", async (IMongoClient client, string ownerScope, string o
 .WithName("UpsertProject")
 .WithSummary("Create or update a project by id");
 
-api.MapPut("/projects/{id}", async (IMongoClient client, string ownerScope, string ownerId, string id, ProjectDocument project, CancellationToken ct) =>
+api.MapPut("/projects/{id}", async (IMongoClient client, HttpContext ctx, string id, ProjectDocument project, CancellationToken ct) =>
 {
     project.Id = id;
     var db = GetDb(client);
     var col = db.GetCollection<ProjectDocument>("projects");
     var existing = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
     if (existing is null) return Results.NotFound();
-    if (!HasOwnerAccess(existing, ownerScope, ownerId)) return Results.Forbid();
+    var userInfo = ResolveUser(ctx);
+    if (!HasOwnerAccess(existing, "user", userInfo.Id)) return Results.Forbid();
     project.OwnerScope = existing.OwnerScope;
     project.OwnerId = existing.OwnerId;
     project.OrgId = existing.OrgId;
@@ -217,28 +243,30 @@ api.MapPut("/projects/{id}", async (IMongoClient client, string ownerScope, stri
 .WithSummary("Replace a project by id");
 
 // NFR API (get/put per project)
-api.MapGet("/projects/{projectId}/nfr", async (IMongoClient client, string ownerScope, string ownerId, string projectId, CancellationToken ct) =>
+api.MapGet("/projects/{projectId}/nfr", async (IMongoClient client, HttpContext ctx, string projectId, CancellationToken ct) =>
 {
     var db = GetDb(client);
     var col = db.GetCollection<NfrAssessmentDocument>("nfrAssessments");
     var projects = db.GetCollection<ProjectDocument>("projects");
     var project = await projects.Find(x => x.Id == projectId).FirstOrDefaultAsync(ct);
     if (project is null) return Results.NotFound();
-    if (!HasReadAccess(project, ownerScope, ownerId)) return Results.Forbid();
+    var userInfo = ResolveUser(ctx);
+    if (!HasReadAccess(project, "user", userInfo.Id)) return Results.Forbid();
     var doc = await col.Find(x => x.ProjectId == projectId).FirstOrDefaultAsync(ct);
     return doc is null ? Results.NotFound() : Results.Ok(doc);
 })
 .WithName("GetProjectNfr")
 .WithSummary("Get NFR assessment for a project");
 
-api.MapPut("/projects/{projectId}/nfr", async (IMongoClient client, string ownerScope, string ownerId, string projectId, NfrAssessmentDocument body, CancellationToken ct) =>
+api.MapPut("/projects/{projectId}/nfr", async (IMongoClient client, HttpContext ctx, string projectId, NfrAssessmentDocument body, CancellationToken ct) =>
 {
     var db = GetDb(client);
     var col = db.GetCollection<NfrAssessmentDocument>("nfrAssessments");
     var projects = db.GetCollection<ProjectDocument>("projects");
     var project = await projects.Find(x => x.Id == projectId).FirstOrDefaultAsync(ct);
     if (project is null) return Results.NotFound();
-    if (!HasWriteAccess(project, ownerScope, ownerId)) return Results.Forbid();
+    var userInfo = ResolveUser(ctx);
+    if (!HasWriteAccess(project, "user", userInfo.Id)) return Results.Forbid();
     body.ProjectId = projectId;
     if (string.IsNullOrWhiteSpace(body.Id)) body.Id = projectId;
     body.LastModified = DateTime.UtcNow;
@@ -252,25 +280,27 @@ api.MapPut("/projects/{projectId}/nfr", async (IMongoClient client, string owner
 // Sharing endpoints
 record ProjectShareRequest(string PrincipalType, string PrincipalId, string Role);
 
-api.MapGet("/projects/{id}/shares", async (IMongoClient client, string ownerScope, string ownerId, string id, CancellationToken ct) =>
+api.MapGet("/projects/{id}/shares", async (IMongoClient client, HttpContext ctx, string id, CancellationToken ct) =>
 {
     var db = GetDb(client);
     var col = db.GetCollection<ProjectDocument>("projects");
     var project = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
     if (project is null) return Results.NotFound();
-    if (!HasOwnerAccess(project, ownerScope, ownerId)) return Results.Forbid();
+    var userInfo = ResolveUser(ctx);
+    if (!HasOwnerAccess(project, "user", userInfo.Id)) return Results.Forbid();
     return Results.Ok(project.Collaborators ?? new());
 })
 .WithName("ListProjectShares")
 .WithSummary("List collaborators for a project");
 
-api.MapPost("/projects/{id}/shares", async (IMongoClient client, string ownerScope, string ownerId, string id, ProjectShareRequest request, CancellationToken ct) =>
+api.MapPost("/projects/{id}/shares", async (IMongoClient client, HttpContext ctx, string id, ProjectShareRequest request, CancellationToken ct) =>
 {
     var db = GetDb(client);
     var col = db.GetCollection<ProjectDocument>("projects");
     var project = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
     if (project is null) return Results.NotFound();
-    if (!HasOwnerAccess(project, ownerScope, ownerId)) return Results.Forbid();
+    var userInfo = ResolveUser(ctx);
+    if (!HasOwnerAccess(project, "user", userInfo.Id)) return Results.Forbid();
 
     if (request.PrincipalType == project.OwnerScope && request.PrincipalId == project.OwnerId)
         return Results.BadRequest(new { message = "Owner already has full access" });
@@ -296,13 +326,14 @@ api.MapPost("/projects/{id}/shares", async (IMongoClient client, string ownerSco
 .WithName("UpsertProjectShare")
 .WithSummary("Add or update a collaborator on a project");
 
-api.MapDelete("/projects/{id}/shares/{principalId}", async (IMongoClient client, string ownerScope, string ownerId, string id, string principalId, CancellationToken ct) =>
+api.MapDelete("/projects/{id}/shares/{principalId}", async (IMongoClient client, HttpContext ctx, string id, string principalId, CancellationToken ct) =>
 {
     var db = GetDb(client);
     var col = db.GetCollection<ProjectDocument>("projects");
     var project = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
     if (project is null) return Results.NotFound();
-    if (!HasOwnerAccess(project, ownerScope, ownerId)) return Results.Forbid();
+    var userInfo = ResolveUser(ctx);
+    if (!HasOwnerAccess(project, "user", userInfo.Id)) return Results.Forbid();
     project.Collaborators ??= new();
     project.Collaborators.RemoveAll(c => c.PrincipalId == principalId);
     project.LastModified = DateTime.UtcNow;
