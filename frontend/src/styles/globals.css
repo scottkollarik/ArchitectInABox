@@ -9,7 +9,29 @@
   }
   
   body {
-    @apply bg-architect-gray-50 text-architect-gray-900;
+    @apply bg-architect-gray-50 text-architect-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300;
+  }
+
+  /* Default form element chrome */
+  input[type='text'],
+  input[type='email'],
+  input[type='number'],
+  input[type='tel'],
+  input[type='url'],
+  input[type='search'],
+  input[type='password'],
+  input[type='datetime-local'],
+  input[type='date'],
+  input[type='time'],
+  input[type='month'],
+  input[type='week'],
+  textarea,
+  select {
+    @apply bg-white dark:bg-gray-900 text-architect-gray-900 dark:text-gray-100 border border-architect-gray-300 dark:border-gray-700 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-azure-blue-500 focus:border-azure-blue-500 placeholder-architect-gray-400 dark:placeholder-gray-500 transition-colors duration-200;
+  }
+
+  textarea {
+    @apply resize-y;
   }
   
   /* Scrollbar styles */
@@ -19,74 +41,74 @@
   }
   
   ::-webkit-scrollbar-track {
-    @apply bg-architect-gray-100;
+    @apply bg-architect-gray-100 dark:bg-gray-800;
   }
   
   ::-webkit-scrollbar-thumb {
-    @apply bg-architect-gray-300 rounded-full;
+    @apply bg-architect-gray-300 dark:bg-gray-600 rounded-full;
   }
   
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-architect-gray-400;
+    @apply bg-architect-gray-400 dark:bg-gray-500;
   }
 }
 
 /* Custom component styles */
 @layer components {
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-architect-gray-200 p-6;
+    @apply bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-architect-gray-200 dark:border-gray-700 p-6 transition-colors duration-300;
   }
   
   .card-header {
-    @apply border-b border-architect-gray-200 pb-4 mb-4;
+    @apply border-b border-architect-gray-200 dark:border-gray-700 pb-4 mb-4;
   }
   
   .btn-primary {
-    @apply bg-azure-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-azure-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-azure-blue-500 focus:ring-offset-2;
+    @apply bg-azure-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-azure-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-azure-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900;
   }
   
   .btn-secondary {
-    @apply bg-architect-gray-200 text-architect-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-architect-gray-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-architect-gray-500 focus:ring-offset-2;
+    @apply bg-architect-gray-200 dark:bg-gray-700 text-architect-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg font-medium hover:bg-architect-gray-300 dark:hover:bg-gray-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-architect-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900;
   }
   
   .input-field {
-    @apply w-full px-3 py-2 border border-architect-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-azure-blue-500 focus:border-azure-blue-500 transition-colors duration-200;
+    @apply w-full px-3 py-2 border border-architect-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-architect-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-azure-blue-500 focus:border-azure-blue-500 transition-colors duration-200;
   }
   
   .select-field {
-    @apply w-full px-3 py-2 border border-architect-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-azure-blue-500 focus:border-azure-blue-500 transition-colors duration-200 bg-white;
+    @apply w-full px-3 py-2 border border-architect-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-azure-blue-500 focus:border-azure-blue-500 transition-colors duration-200 bg-white dark:bg-gray-800 text-architect-gray-900 dark:text-gray-100;
   }
   
   .label-text {
-    @apply block text-sm font-medium text-architect-gray-700 mb-1;
+    @apply block text-sm font-medium text-architect-gray-700 dark:text-gray-300 mb-1 transition-colors duration-200;
   }
   
   .help-text {
-    @apply text-xs text-architect-gray-500 mt-1;
+    @apply text-xs text-architect-gray-500 dark:text-gray-400 mt-1 transition-colors duration-200;
   }
   
   .badge-required {
-    @apply inline-block px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full;
+    @apply inline-block px-2 py-1 text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200 rounded-full transition-colors;
   }
   
   .badge-optional {
-    @apply inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full;
+    @apply inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 rounded-full transition-colors;
   }
   
   .badge-service-tier {
-    @apply inline-block px-2 py-1 text-xs font-medium rounded-full;
+    @apply inline-block px-2 py-1 text-xs font-medium rounded-full transition-colors;
   }
   
   .badge-paas {
-    @apply badge-service-tier bg-green-100 text-green-800;
+    @apply badge-service-tier bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200;
   }
   
   .badge-iaas {
-    @apply badge-service-tier bg-yellow-100 text-yellow-800;
+    @apply badge-service-tier bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200;
   }
   
   .badge-saas {
-    @apply badge-service-tier bg-purple-100 text-purple-800;
+    @apply badge-service-tier bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200;
   }
   
   .drag-item {
@@ -98,23 +120,23 @@
   }
   
   .drop-zone {
-    @apply border-2 border-dashed border-architect-gray-300 rounded-lg transition-all duration-200;
+    @apply border-2 border-dashed border-architect-gray-300 dark:border-gray-700 rounded-lg transition-all duration-200;
   }
   
   .drop-zone.drag-over {
-    @apply border-azure-blue-400 bg-azure-blue-50;
+    @apply border-azure-blue-400 bg-azure-blue-50 dark:bg-azure-blue-900/40;
   }
   
   .service-node {
-    @apply bg-white border border-architect-gray-200 rounded-lg p-3 shadow-sm transition-all duration-200 hover:shadow-md;
+    @apply bg-white dark:bg-gray-900 border border-architect-gray-200 dark:border-gray-700 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md overflow-hidden;
   }
   
   .service-node.auto-included {
-    @apply border-blue-200 bg-blue-50;
+    @apply border-blue-200 dark:border-blue-600 bg-blue-50 dark:bg-blue-900;
   }
   
   .section-header {
-    @apply flex items-center justify-between p-4 cursor-pointer hover:bg-architect-gray-50 transition-colors duration-200;
+    @apply flex items-center justify-between p-4 cursor-pointer hover:bg-architect-gray-50 dark:hover:bg-gray-800 transition-colors duration-200;
   }
   
   .section-content {
@@ -122,19 +144,19 @@
   }
   
   .completion-indicator {
-    @apply flex items-center space-x-2 text-sm;
+    @apply flex items-center space-x-2 text-sm text-architect-gray-600 dark:text-gray-300 transition-colors;
   }
   
   .completion-indicator.complete {
-    @apply text-green-600;
+    @apply text-green-600 dark:text-green-400;
   }
   
   .completion-indicator.incomplete {
-    @apply text-red-600;
+    @apply text-red-600 dark:text-red-400;
   }
   
   .completion-indicator.partial {
-    @apply text-yellow-600;
+    @apply text-yellow-600 dark:text-yellow-400;
   }
 }
 
@@ -252,15 +274,15 @@
 
 /* Error states */
 .error-state {
-  @apply border-red-300 bg-red-50 text-red-700;
+  @apply border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200;
 }
 
 .success-state {
-  @apply border-green-300 bg-green-50 text-green-700;
+  @apply border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-200;
 }
 
 .warning-state {
-  @apply border-yellow-300 bg-yellow-50 text-yellow-700;
+  @apply border-yellow-300 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200;
 }
 
 /* Mobile responsiveness improvements */

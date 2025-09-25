@@ -86,7 +86,7 @@ const AvgPeakRps: React.FC<AvgPeakRpsProps> = ({ id, value, onChange, className 
     <div className={`mt-1 ${className}`}>
       <div className="flex flex-wrap items-end gap-2">
         <div className="w-32">
-          <label htmlFor={`${id}-average-rps`} className="block text-[11px] font-medium text-gray-700 mb-0.5">Average RPS</label>
+          <label htmlFor={`${id}-average-rps`} className="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">Average RPS</label>
           <input
             id={`${id}-average-rps`}
             ref={avgRef}
@@ -99,13 +99,13 @@ const AvgPeakRps: React.FC<AvgPeakRpsProps> = ({ id, value, onChange, className 
               if (avgError) setAvgError('')
             }}
             onBlur={() => { if (validateAndFormat('average-rps')) crossValidate() }}
-            className={`block w-full px-2 py-1.5 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${avgError ? 'border-red-400' : 'border-gray-300'}`}
+            className={`block w-full px-2 py-1.5 border rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${avgError ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
             placeholder="1,000"
           />
           {avgError && <div className="mt-0.5 text-[10px] text-red-600">{avgError}</div>}
         </div>
         <div className="w-32">
-          <label htmlFor={`${id}-peak-rps`} className="block text-[11px] font-medium text-gray-700 mb-0.5">Peak RPS</label>
+          <label htmlFor={`${id}-peak-rps`} className="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">Peak RPS</label>
           <input
             id={`${id}-peak-rps`}
             ref={peakRef}
@@ -118,7 +118,7 @@ const AvgPeakRps: React.FC<AvgPeakRpsProps> = ({ id, value, onChange, className 
               if (peakError) setPeakError('')
             }}
             onBlur={() => { if (validateAndFormat('peak-rps')) crossValidate() }}
-            className={`block w-full px-2 py-1.5 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${peakError ? 'border-red-400' : 'border-gray-300'}`}
+            className={`block w-full px-2 py-1.5 border rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${peakError ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
             placeholder="5,000"
           />
           {peakError && <div className="mt-0.5 text-[10px] text-red-600">{peakError}</div>}

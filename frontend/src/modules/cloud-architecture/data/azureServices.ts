@@ -1,4 +1,5 @@
-import { AzureService, AzureServiceCatalog } from '../types'
+import { AzureService, AzureServiceCatalog, ProjectProfile, ProjectCloudConfig, NFRSection } from '../types'
+import { WAF_BASELINE_SERVICES, WAF_DYNAMIC_RULES, extractNfrAnswers } from './wafGuidance'
 
 // Azure Services based on the user's playbook
 export const azureServiceCatalog: AzureServiceCatalog = {
@@ -739,128 +740,141 @@ export const getServicesRequiring = (serviceId: string): AzureService[] => {
 }
 
 // Mock architecture recommendations based on NFR assessment
-export const generateRecommendations = (nfrAssessment: any) => {
-  // This would be implemented with real logic based on the assessment
-  // For now, return a basic recommendation based on common patterns
-  
-  const recommendations = []
-  
-  // Always recommend core networking and identity
-  recommendations.push(
-    getServiceById('azure-vnet'),
-    getServiceById('managed-identity')
-  )
-  
-  // Compute recommendations based on preferences
-  if (nfrAssessment?.serverlessAcceptable === 'Yes, cold starts OK') {
-    recommendations.push(getServiceById('azure-container-apps'))
-    recommendations.push(getServiceById('azure-functions'))
-  } else if (nfrAssessment?.platformPreference === 'Container-based (AKS)') {
-    recommendations.push(getServiceById('azure-kubernetes-service'))
+export const generateRecommendations = (
+  nfrSummary: any,
+  options?: {
+    sections?: NFRSection[]
+    profile?: ProjectProfile
+    cloud?: ProjectCloudConfig
+  }
+) => {
+  const summary = nfrSummary || {}
+  const profile = options?.profile
+  const cloud = options?.cloud || summary.cloud || { cloudFamily: 'public' }
+
+  const recommendations = new Map<string, AzureService>()
+  const addService = (service?: AzureService | null) => {
+    if (service) {
+      recommendations.set(service.id, service)
+    }
+  }
+  const addById = (serviceId?: string) => {
+    if (!serviceId) return
+    addService(getServiceById(serviceId))
+  }
+
+  if (!profile || profile.useWafBaseline !== false) {
+    WAF_BASELINE_SERVICES.forEach(({ serviceId }) => addById(serviceId))
+  }
+
+  if (profile?.wafAdaptiveAdditions) {
+    const answers = extractNfrAnswers(options?.sections)
+    const context: WafRuleContext = { cloudFamily: (cloud?.cloudFamily || 'public') as 'public' | 'gov' }
+    WAF_DYNAMIC_RULES.forEach((rule) => {
+      const desired = rule.getServices(answers.get(rule.questionId), context)
+      desired.forEach(addById)
+    })
+  }
+
+  // Compute preferences
+  if (summary.serverlessAcceptable === 'Yes, cold starts OK') {
+    addById('azure-container-apps')
+    addById('azure-functions')
+  } else if (summary.platformPreference === 'Container-based (AKS)') {
+    addById('azure-kubernetes-service')
   } else {
-    recommendations.push(getServiceById('app-service'))
+    addById('app-service')
   }
-  
-  // Data recommendations based on data model
-  if (nfrAssessment?.dataModel === 'Relational') {
-    recommendations.push(getServiceById('azure-sql-hyperscale'))
-  } else if (nfrAssessment?.dataModel === 'Document' || nfrAssessment?.dataModel === 'Key-value') {
-    recommendations.push(getServiceById('cosmos-db'))
+
+  // Data platform recommendations
+  const dataModels = Array.isArray(summary.dataModels) ? summary.dataModels : []
+  const primaryDataType = (() => {
+    if (dataModels.length > 0) return (dataModels[0].type || '').toString()
+    return (summary.dataModel || '').toString()
+  })().toLowerCase()
+
+  if (primaryDataType.includes('relational') || primaryDataType.includes('sql')) {
+    addById('azure-sql-hyperscale')
+  } else if (primaryDataType.includes('document') || primaryDataType.includes('key')) {
+    addById('cosmos-db')
   }
-  
-  // Always recommend monitoring
-  recommendations.push(
-    getServiceById('log-analytics'),
-    getServiceById('app-insights')
-  )
-  
-  // Security recommendations based on requirements
-  if (nfrAssessment?.encryptionReqs || nfrAssessment?.secretsManagement) {
-    recommendations.push(getServiceById('key-vault'))
+
+  // Monitoring & observability
+  addById('log-analytics')
+  addById('app-insights')
+
+  if (summary.encryptionReqs || summary.secretsManagement || summary.keyManagement === 'Customer-managed') {
+    addById('key-vault')
   }
-  
-  if (nfrAssessment?.networkPosture?.includes('Private')) {
-    recommendations.push(getServiceById('private-endpoints'))
+
+  if (typeof summary.networkPosture === 'string' && /private/i.test(summary.networkPosture)) {
+    addById('private-endpoints')
   }
-  
-  // Caching for performance: heavy read or low-latency sensitivity
+
   try {
-    const rwr = nfrAssessment?.readWriteRatio
+    const rwr = summary.readWriteRatio
     const readPct = typeof rwr === 'object' ? Number(rwr.read) || 0 : 0
     const heavyRead = readPct >= 80
-    const lowLatencySensitive = !!nfrAssessment?.latencyTargets
+    const lowLatencySensitive = !!summary.latencyTargets
     if (heavyRead || lowLatencySensitive) {
-      recommendations.push(getServiceById('azure-cache-redis'))
+      addById('azure-cache-redis')
     }
   } catch {}
 
-  // Messaging & streaming
-  const requestRaw = nfrAssessment?.requestTypes || nfrAssessment?.request_types || nfrAssessment?.['request-types']
+  const requestRaw = summary.requestCharacteristics
   let requestSelections: string[] = []
   let requestNotes = ''
-  if (Array.isArray(requestRaw)) {
-    requestSelections = requestRaw
-  } else if (requestRaw && typeof requestRaw === 'object') {
+  if (requestRaw && typeof requestRaw === 'object') {
     requestSelections = Array.isArray(requestRaw.selections) ? requestRaw.selections : []
     requestNotes = typeof requestRaw.notes === 'string' ? requestRaw.notes : ''
+  } else if (Array.isArray(requestRaw)) {
+    requestSelections = requestRaw
   } else if (typeof requestRaw === 'string') {
     requestNotes = requestRaw
   }
   const requestText = [...requestSelections, requestNotes].join(' ').toLowerCase()
-  const expectedRps = parseInt(String(nfrAssessment?.expectedRps || nfrAssessment?.expected_rps || ''), 10)
+  const expectedRps = parseInt(String(summary.expectedRps || ''), 10)
 
   const hasQueueing = requestSelections.some(opt => /queue|background|batch/i.test(opt)) || requestText.includes('queue') || requestText.includes('async') || requestText.includes('worker')
   const hasStreaming = requestSelections.some(opt => /stream|websocket|long-poll/i.test(opt)) || requestText.includes('stream') || requestText.includes('websocket') || requestText.includes('long-poll')
   const hasEvents = requestSelections.some(opt => /fan-out|pub-sub/i.test(opt)) || requestText.includes('event') || requestText.includes('pubsub')
 
   if (hasQueueing) {
-    recommendations.push(getServiceById('service-bus'))
+    addById('service-bus')
   }
   if (hasStreaming || hasEvents || requestText.includes('kafka') || (!isNaN(expectedRps) && expectedRps > 5000)) {
-    recommendations.push(getServiceById('event-hubs'))
+    addById('event-hubs')
   }
 
-  // Analytics & warehousing
-  const sa = nfrAssessment?.searchAnalytics || nfrAssessment?.['search-analytics']
+  const sa = summary.searchAnalytics || summary['search-analytics']
   const useCases: string[] = Array.isArray(sa?.['use-cases']) ? sa['use-cases'] : []
   const freshness: string | undefined = sa?.freshness
-  const dataGrowth = nfrAssessment?.dataGrowth || nfrAssessment?.['data-growth']
+  const dataGrowth = summary.dataGrowth || summary['data-growth']
   if (useCases.includes('BI dashboards') || useCases.includes('Ad-hoc SQL') || useCases.includes('Operational reporting')) {
-    recommendations.push(getServiceById('synapse'))
+    addById('synapse')
   }
   if (useCases.includes('Batch ETL') || useCases.includes('ML feature store/training')) {
-    recommendations.push(getServiceById('databricks'))
+    addById('databricks')
   }
   if (useCases.includes('Real-time streaming') || freshness === 'Real-time (<1 min)' || freshness === 'Near-real-time (1–15 min)') {
-    recommendations.push(getServiceById('event-hubs'))
+    addById('event-hubs')
   }
   if (dataGrowth || useCases.length > 0) {
-    recommendations.push(getServiceById('adls-gen2'))
+    addById('adls-gen2')
   }
 
-  // Global entry and multi-region routing
-  try {
-    const multiRegionSetting = nfrAssessment?.multiRegion
-    const cloud = nfrAssessment?.cloud || {}
-    const isMultiRegion =
-      (multiRegionSetting && multiRegionSetting !== 'Not needed') ||
-      (cloud?.drStrategy && cloud.drStrategy !== 'none') ||
-      (!!cloud?.secondaryRegionId)
-    if (isMultiRegion) {
-      // Azure Front Door on public cloud; fallback to App Gateway for gov
-      if ((cloud?.cloudFamily || 'public') === 'public') {
-        recommendations.push(getServiceById('front-door'))
-      } else {
-        // App Gateway may act as alternative if Front Door unavailable
-        recommendations.push(getServiceById('app-gateway'))
-      }
-    }
-  } catch {}
+  const multiRegionSetting = summary.multiRegion
+  const isMultiRegion =
+    (multiRegionSetting && multiRegionSetting !== 'Not needed') ||
+    (cloud?.drStrategy && cloud.drStrategy !== 'none') ||
+    !!cloud?.secondaryRegionId
+  if (isMultiRegion) {
+    addById((cloud?.cloudFamily || 'public') === 'public' ? 'front-door' : 'app-gateway')
+  }
 
-  // API management
   if (requestText.includes('api')) {
-    recommendations.push(getServiceById('api-management'))
+    addById('api-management')
   }
-  
-  return recommendations.filter(Boolean) as AzureService[]
+
+  return Array.from(recommendations.values())
 }

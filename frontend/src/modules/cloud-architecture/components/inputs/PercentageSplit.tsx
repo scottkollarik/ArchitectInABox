@@ -56,7 +56,7 @@ const PercentageSplit: React.FC<PercentageSplitProps> = ({ id, value, onChange, 
     return (
       <div className={`space-y-1 ${className}`}>
         <div className="w-1/3 min-w-[220px] max-w-[360px]">
-          <div className="flex items-center justify-between text-xs text-gray-700">
+        <div className="flex items-center justify-between text-xs text-gray-700 dark:text-gray-300">
             <span>{labels?.read || 'Reads'} {sliderRead}%</span>
             <span>{labels?.write || 'Writes'} {sliderWrite}%</span>
           </div>
@@ -84,19 +84,19 @@ const PercentageSplit: React.FC<PercentageSplitProps> = ({ id, value, onChange, 
     <div className={`space-y-2 ${className}`}>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label htmlFor={`${id}-read`} className="block text-xs font-medium text-gray-700 mb-1">{labels?.read || 'Reads %'}</label>
+          <label htmlFor={`${id}-read`} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{labels?.read || 'Reads %'}</label>
           <input id={`${id}-read`} inputMode="numeric" pattern="[0-9]*" value={internal.read === '' || internal.read === undefined || internal.read === null ? '' : String(internal.read)}
             onChange={(e) => setRead(e.target.value)}
-            className="block w-20 px-2 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm" placeholder="80" />
+            className="block w-20 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm" placeholder="80" />
         </div>
         <div>
-          <label htmlFor={`${id}-write`} className="block text-xs font-medium text-gray-700 mb-1">{labels?.write || 'Writes %'}</label>
+          <label htmlFor={`${id}-write`} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{labels?.write || 'Writes %'}</label>
           <input id={`${id}-write`} inputMode="numeric" pattern="[0-9]*" value={internal.write === '' || internal.write === undefined || internal.write === null ? '' : String(internal.write)}
             onChange={(e) => setWrite(e.target.value)}
-            className="block w-20 px-2 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm" placeholder="20" />
+            className="block w-20 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm" placeholder="20" />
         </div>
       </div>
-      <div className="text-xs text-gray-600">Total: <span className={invalid ? 'text-red-600 font-medium' : 'text-gray-900 font-medium'}>{total}</span>% (must equal 100%)</div>
+      <div className="text-xs text-gray-600 dark:text-gray-400">Total: <span className={invalid ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-900 dark:text-gray-100 font-medium'}>{total}</span>% (must equal 100%)</div>
     </div>
   )
 }

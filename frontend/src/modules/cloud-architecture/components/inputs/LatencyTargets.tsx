@@ -92,20 +92,20 @@ const LatencyTargets: React.FC<LatencyTargetsProps> = ({ id, value, onChange, cl
     <div className={`space-y-2 ${className}`}>
       <div className="flex items-end gap-3 flex-wrap">
         <div className="flex-0">
-          <label htmlFor={`${id}-p95`} className="block text-xs font-medium text-gray-700 mb-1">P95 (ms)</label>
+        <label htmlFor={`${id}-p95`} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">P95 (ms)</label>
           <div className="flex items-center gap-1">
-            <input id={`${id}-p95`} ref={p95Ref} inputMode="numeric" pattern="[0-9]*" className={`block w-24 px-2 py-1.5 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${p95Err ? 'border-red-400' : 'border-gray-300'}`} placeholder="200" value={internal.p95}
+            <input id={`${id}-p95`} ref={p95Ref} inputMode="numeric" pattern="[0-9]*" className={`block w-24 px-2 py-1.5 border rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm ${p95Err ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`} placeholder="200" value={internal.p95}
               onChange={(e)=>{ setP95Err(''); update('p95', e.target.value)}} onBlur={()=>validateNumber('p95')} />
-            <div className="text-[10px] text-gray-500 whitespace-nowrap">{secHint(internal.p95)}</div>
+            <div className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">{secHint(internal.p95)}</div>
           </div>
           {p95Err && <div className="text-[10px] text-red-600 mt-0.5">{p95Err}</div>}
         </div>
         <div className="flex-0">
-          <label htmlFor={`${id}-p99`} className="block text-xs font-medium text-gray-700 mb-1">P99 (ms)</label>
+        <label htmlFor={`${id}-p99`} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">P99 (ms)</label>
           <div className="flex items-center gap-1">
-            <input id={`${id}-p99`} ref={p99Ref} inputMode="numeric" pattern="[0-9]*" className={`block w-24 px-2 py-1.5 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${p99Err ? 'border-red-400' : 'border-gray-300'}`} placeholder="500" value={internal.p99}
+            <input id={`${id}-p99`} ref={p99Ref} inputMode="numeric" pattern="[0-9]*" className={`block w-24 px-2 py-1.5 border rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm ${p99Err ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`} placeholder="500" value={internal.p99}
               onChange={(e)=>{ setP99Err(''); update('p99', e.target.value)}} onBlur={()=>validateNumber('p99')} />
-            <div className="text-[10px] text-gray-500 whitespace-nowrap">{secHint(internal.p99)}</div>
+            <div className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">{secHint(internal.p99)}</div>
           </div>
           {p99Err && <div className="text-[10px] text-red-600 mt-0.5">{p99Err}</div>}
         </div>

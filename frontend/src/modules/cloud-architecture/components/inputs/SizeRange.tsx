@@ -74,27 +74,27 @@ const SizeRange: React.FC<SizeRangeProps> = ({ id, value, onChange, className = 
     <div className={`space-y-0 ${className}`}>
       <div className="flex items-end gap-2 flex-wrap">
         <div>
-          <label htmlFor={`${id}-min`} className="block text-[11px] font-medium text-gray-700 mb-0.5">Min</label>
+        <label htmlFor={`${id}-min`} className="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">Min</label>
           <div className="flex items-end gap-1">
-            <input id={`${id}-min`} ref={minRef} inputMode="numeric" pattern="[0-9]*" className={`block w-20 px-2 py-1 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${minError ? 'border-red-400' : 'border-gray-300'}`} value={v.min} onChange={(e)=>{ setMinError(''); const raw=e.target.value; if (raw===''){ update('min','') } else { const n=parseInt(raw,10); if (!isNaN(n)) update('min', n); else setMinError('Enter a valid number') } }} onBlur={()=>validateBlur('min')} />
-            <select aria-label="Min unit" className="block w-18 px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm" value={v.minUnit} onChange={(e)=>update('minUnit', e.target.value)}>
+            <input id={`${id}-min`} ref={minRef} inputMode="numeric" pattern="[0-9]*" className={`block w-20 px-2 py-1 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 ${minError ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`} value={v.min} onChange={(e)=>{ setMinError(''); const raw=e.target.value; if (raw===''){ update('min','') } else { const n=parseInt(raw,10); if (!isNaN(n)) update('min', n); else setMinError('Enter a valid number') } }} onBlur={()=>validateBlur('min')} />
+            <select aria-label="Min unit" className="block w-18 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm" value={v.minUnit} onChange={(e)=>update('minUnit', e.target.value)}>
               {['B','KB','MB','GB','TB'].map(u => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>
           {minError && <div className="mt-0.5 text-[10px] text-red-600">{minError}</div>}
         </div>
         <div>
-          <label htmlFor={`${id}-max`} className="block text-[11px] font-medium text-gray-700 mb-0.5">Max</label>
+        <label htmlFor={`${id}-max`} className="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">Max</label>
           <div className="flex items-end gap-1">
-            <input id={`${id}-max`} ref={maxRef} inputMode="numeric" pattern="[0-9]*" className={`block w-20 px-2 py-1 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${maxError ? 'border-red-400' : 'border-gray-300'}`} value={v.max} onChange={(e)=>{ setMaxError(''); const raw=e.target.value; if (raw===''){ update('max','') } else { const n=parseInt(raw,10); if (!isNaN(n)) update('max', n); else setMaxError('Enter a valid number') } }} onBlur={()=>validateBlur('max')} />
-            <select aria-label="Max unit" className="block w-18 px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm" value={v.maxUnit} onChange={(e)=>update('maxUnit', e.target.value)}>
+            <input id={`${id}-max`} ref={maxRef} inputMode="numeric" pattern="[0-9]*" className={`block w-20 px-2 py-1 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 ${maxError ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`} value={v.max} onChange={(e)=>{ setMaxError(''); const raw=e.target.value; if (raw===''){ update('max','') } else { const n=parseInt(raw,10); if (!isNaN(n)) update('max', n); else setMaxError('Enter a valid number') } }} onBlur={()=>validateBlur('max')} />
+            <select aria-label="Max unit" className="block w-18 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm" value={v.maxUnit} onChange={(e)=>update('maxUnit', e.target.value)}>
               {['B','KB','MB','GB','TB'].map(u => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>
           {maxError && <div className="mt-0.5 text-[10px] text-red-600">{maxError}</div>}
         </div>
       </div>
-      {invalid && <div className="text-xs text-red-600">Min should be less than or equal to Max.</div>}
+      {invalid && <div className="text-xs text-red-600 dark:text-red-400">Min should be less than or equal to Max.</div>}
     </div>
   )
 }

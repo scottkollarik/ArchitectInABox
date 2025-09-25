@@ -59,12 +59,12 @@ const AzureRegionSelector: React.FC<AzureRegionSelectorProps> = ({ id, value, on
       )}
       <div className="grid md:grid-cols-2 gap-3">
         <div>
-          <label htmlFor={`${id}-primary`} className="block text-xs font-medium text-gray-700 mb-1">Primary Region</label>
+          <label htmlFor={`${id}-primary`} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Primary Region</label>
           <select
             id={`${id}-primary`}
             value={primary}
             onChange={(e) => handlePrimary(e.target.value)}
-            className="inline-block w-64 max-w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+            className="inline-block w-64 max-w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
           >
             <option value="">Select a region...</option>
             {azureRegions.map(r => (
@@ -74,12 +74,12 @@ const AzureRegionSelector: React.FC<AzureRegionSelectorProps> = ({ id, value, on
         </div>
 
         <div>
-          <label htmlFor={`${id}-strategy`} className="block text-xs font-medium text-gray-700 mb-1">DR Strategy</label>
+          <label htmlFor={`${id}-strategy`} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">DR Strategy</label>
           <select
             id={`${id}-strategy`}
             value={drStrategy}
             onChange={(e) => handleStrategy(e.target.value as DRStrategy)}
-            className="inline-block w-64 max-w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+            className="inline-block w-64 max-w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
           >
             <option value="paired">Use Paired Region</option>
             <option value="manual">Manual Secondary</option>
@@ -98,12 +98,12 @@ const AzureRegionSelector: React.FC<AzureRegionSelectorProps> = ({ id, value, on
             </div>
           ) : (
             <div>
-              <label htmlFor={`${id}-secondary`} className="block text-xs font-medium text-gray-700 mb-1">Secondary Region</label>
+              <label htmlFor={`${id}-secondary`} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Secondary Region</label>
               <select
                 id={`${id}-secondary`}
                 value={secondary || ''}
                 onChange={(e) => handleSecondary(e.target.value)}
-                className="inline-block w-64 max-w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+                className="inline-block w-64 max-w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
               >
                 <option value="">Select a region...</option>
                 {azureRegions

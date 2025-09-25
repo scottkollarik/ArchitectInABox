@@ -7,17 +7,17 @@ const APIDevelopmentPage: React.FC = () => {
     <div className="grid grid-cols-12 gap-6">
       {/* Unified bordered strip that joins the active tab */}
       <div className="col-span-12">
-        <div className="border border-azure-blue-300 rounded-lg shadow-sm overflow-hidden">
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
           {/* Strip header */}
-          <div className="bg-azure-blue-50 px-4 py-2">
+          <div className="bg-gray-100 dark:bg-gray-700 px-4 py-2 border-b border-gray-300 dark:border-gray-600">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="text-base md:text-lg font-semibold text-azure-blue-900">
+              <div className="text-base md:text-lg font-semibold text-gray-900 dark:text-white">
                 API Development
               </div>
               <div className="ml-auto">
                 <button
                   onClick={() => setShowPanel(!showPanel)}
-                  className="text-xs px-2 py-1 rounded border border-azure-blue-300 text-azure-blue-700 hover:bg-white"
+                  className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700"
                 >
                   {showPanel ? 'Hide Planning' : 'Show Planning'}
                 </button>
@@ -26,8 +26,8 @@ const APIDevelopmentPage: React.FC = () => {
           </div>
           {/* Top content panel */}
           {showPanel && (
-            <div className="bg-white">
-              <div className="pt-4 pb-5 px-5 text-sm text-architect-gray-700">
+            <div className="bg-white dark:bg-gray-800">
+              <div className="pt-4 pb-5 px-5 text-sm text-architect-gray-700 dark:text-gray-300">
                 <p className="mb-2">
                   Define API surfaces, versioning strategy, and non-functional requirements that impact API design (idempotency, pagination, rate limits).
                 </p>

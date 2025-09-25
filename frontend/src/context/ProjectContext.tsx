@@ -44,7 +44,13 @@ const createEmptyProject = (id: string, name: string, description: string): Proj
   createdAt: new Date(),
   lastModified: new Date(),
   cloud: { provider: 'azure', cloudFamily: 'public', drStrategy: 'none' },
-  profile: { level: 'starter', size: 'M', criticality: 'dev/test' }
+  profile: {
+    level: 'starter',
+    size: 'M',
+    criticality: 'dev/test',
+    useWafBaseline: true,
+    wafAdaptiveAdditions: false
+  }
 })
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

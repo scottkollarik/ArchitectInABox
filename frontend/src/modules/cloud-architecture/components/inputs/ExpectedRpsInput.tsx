@@ -68,10 +68,10 @@ const ExpectedRpsInput: React.FC<ExpectedRpsInputProps> = ({ id, value, onChange
             if (error) setError('')
           }}
           onBlur={commit}
-          className={`block w-36 px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm ${error ? 'border-red-400' : 'border-gray-300'}`}
+          className={`block w-36 px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 ${error ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
           placeholder="e.g., 1,000"
         />
-        <span className="text-sm text-gray-500">RPS</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">RPS</span>
       </div>
       {error && <div className="mt-0.5 text-[10px] text-red-600">{error}</div>}
     </div>

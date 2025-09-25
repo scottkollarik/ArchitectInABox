@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import { ProjectProvider } from './context/ProjectContext'
+import { ThemeProvider } from './hooks/useTheme'
 import Layout from './components/Layout'
 import CloudArchitecturePage from './modules/cloud-architecture/pages/CloudArchitecturePage'
 import InventoryPage from './modules/inventory/pages/InventoryPage'
@@ -24,26 +25,28 @@ const ProtectedAppShell = () => (
 function App() {
   const basename = import.meta.env.VITE_BASE_PATH || '/'
   return (
-    <ProjectProvider>
-      <DndProvider backend={HTML5Backend}>
-        <Router basename={basename !== '/' ? basename : undefined}>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
+    <ThemeProvider>
+      <ProjectProvider>
+        <DndProvider backend={HTML5Backend}>
+          <Router basename={basename !== '/' ? basename : undefined}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
 
-            <Route element={<ProtectedAppShell />}>
-              <Route path="/" element={<Navigate to="/cloud-architecture" replace />} />
-              <Route path="/cloud-architecture" element={<CloudArchitecturePage />} />
-              <Route path="/inventory" element={<InventoryPage />} />
-              <Route path="/api-development" element={<APIDevelopmentPage />} />
-              <Route path="/frontend-development" element={<FrontendDevelopmentPage />} />
-              <Route path="/system-integration" element={<SystemIntegrationPage />} />
-              <Route path="/ai-development" element={<AIDevelopmentPage />} />
-            </Route>
-          </Routes>
-        </Router>
-      </DndProvider>
-    </ProjectProvider>
+              <Route element={<ProtectedAppShell />}>
+                <Route path="/" element={<Navigate to="/cloud-architecture" replace />} />
+                <Route path="/cloud-architecture" element={<CloudArchitecturePage />} />
+                <Route path="/inventory" element={<InventoryPage />} />
+                <Route path="/api-development" element={<APIDevelopmentPage />} />
+                <Route path="/frontend-development" element={<FrontendDevelopmentPage />} />
+                <Route path="/system-integration" element={<SystemIntegrationPage />} />
+                <Route path="/ai-development" element={<AIDevelopmentPage />} />
+              </Route>
+            </Routes>
+          </Router>
+        </DndProvider>
+      </ProjectProvider>
+    </ThemeProvider>
   )
 }
 

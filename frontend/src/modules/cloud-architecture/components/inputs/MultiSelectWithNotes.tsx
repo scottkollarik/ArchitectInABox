@@ -80,7 +80,7 @@ const MultiSelectWithNotes: React.FC<MultiSelectWithNotesProps> = ({
     <div className={`space-y-3 ${className}`}>
       <div className="space-y-2">
         {optionTokens.map(({ label }) => (
-          <label key={label} className="flex items-start gap-2 text-sm text-gray-700">
+          <label key={label} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">
             <input
               type="checkbox"
               className="mt-0.5 h-4 w-4 text-azure-blue-600 border-gray-300 rounded focus:ring-azure-blue-500"
@@ -91,11 +91,11 @@ const MultiSelectWithNotes: React.FC<MultiSelectWithNotesProps> = ({
           </label>
         ))}
         {options.length === 0 && (
-          <div className="text-xs text-gray-500">No options configured.</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400">No options configured.</div>
         )}
       </div>
       <div>
-        <label htmlFor={`${id}-notes`} className="block text-xs font-medium text-gray-700 mb-1">{notesLabel}</label>
+        <label htmlFor={`${id}-notes`} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{notesLabel}</label>
         <textarea
           id={`${id}-notes`}
           value={internal.notes}

@@ -106,7 +106,7 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
     <div className={`flex items-end gap-2 ${className}`}>
       <div className="flex-1 min-w-[6rem]">
         {label && (
-          <label htmlFor={id} className="block text-xs font-medium text-gray-700 mb-1">
+          <label htmlFor={id} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
             {label}
           </label>
         )}
@@ -117,7 +117,7 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
           ref={inputRef}
           onChange={(e) => { setErr(''); handleValueChange(e.target.value) }}
           onBlur={validateBlur}
-          className={`block w-full px-2 py-1.5 border rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${err ? 'border-red-400' : 'border-gray-300'}`}
+          className={`block w-full px-2 py-1.5 border rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm ${err ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
           placeholder={placeholder}
           disabled={disabled}
           min={min}
@@ -134,7 +134,7 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
             <select
               value={internalValue.unit}
               onChange={(e) => handleUnitChange(e.target.value)}
-              className="block w-20 px-2 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm"
+              className="block w-20 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
               disabled={disabled}
             >
               {units.map((unit) => (
@@ -147,7 +147,7 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
         ) : (
           <div>
             {label && <div className="block text-xs font-medium text-transparent mb-1">Unit</div>}
-            <span className="inline-block px-2 py-1.5 text-xs border border-gray-300 rounded-md bg-white text-gray-700 w-12 text-center">
+            <span className="inline-block px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 w-12 text-center">
               {internalValue.unit}
             </span>
           </div>

@@ -7,6 +7,14 @@ import CopyableNotice from './CopyableNotice'
 import { useAuth } from '../auth/EntraAuthProvider'
 import { buildAuthHeaders, getApiBase } from '../utils/apiClient'
 
+const defaultProfileState = {
+  level: 'starter' as const,
+  size: 'M' as const,
+  criticality: 'dev/test' as const,
+  useWafBaseline: true,
+  wafAdaptiveAdditions: false
+}
+
 const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const { currentProject, updateProject } = useProject()
   const auth = useAuth()
@@ -14,7 +22,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
   const [regionSelection, setRegionSelection] = useState<any>({})
   const [residencyPolicy, setResidencyPolicy] = useState<'no-restriction'|'in-country'|'in-geo'|'custom'>('no-restriction')
   const [residencyCountries, setResidencyCountries] = useState<string[]>([])
-  const [profile, setProfile] = useState({ level: 'starter', size: 'M', criticality: 'dev/test' })
+  const [profile, setProfile] = useState({ ...defaultProfileState })
   const [recipeId, setRecipeId] = useState<string>('')
   const [projectName, setProjectName] = useState('')
   const [projectDescription, setProjectDescription] = useState('')
@@ -51,7 +59,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
   useEffect(() => {
     if (!open || !currentProject) return
     setCloudFamily(currentProject.cloud?.cloudFamily || 'public')
-    setProfile(currentProject.profile || { level: 'starter', size: 'M', criticality: 'dev/test' })
+    setProfile({ ...defaultProfileState, ...(currentProject.profile || {}) })
     setRecipeId((currentProject.profile as any)?.recipe || '')
     setProjectName(currentProject.name || '')
     setProjectDescription(currentProject.description || '')
@@ -87,62 +95,62 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="bg-white dark:bg-gray-950 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col border border-architect-gray-200 dark:border-gray-800 transition-colors">
         {/* Header */}
-        <div className="p-4 border-b border-architect-gray-200 flex items-center justify-between">
+        <div className="p-4 border-b border-architect-gray-200 dark:border-gray-800 flex items-center justify-between">
           <div>
-            <div className="text-xs text-architect-gray-500">Project</div>
+            <div className="text-xs text-architect-gray-500 dark:text-gray-400">Project</div>
             {!editingIdentity ? (
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-semibold text-architect-gray-900">{projectName || currentProject?.name}</h3>
-                <button className="text-xs text-architect-gray-600 border border-architect-gray-300 rounded px-2 py-0.5 hover:bg-architect-gray-50" onClick={() => setEditingIdentity(true)}>Edit</button>
+                <h3 className="text-lg font-semibold text-architect-gray-900 dark:text-gray-100">{projectName || currentProject?.name}</h3>
+                <button className="text-xs text-architect-gray-600 dark:text-gray-300 border border-architect-gray-300 dark:border-gray-700 rounded px-2 py-0.5 hover:bg-architect-gray-50 dark:hover:bg-gray-800 transition-colors" onClick={() => setEditingIdentity(true)}>Edit</button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <input className="px-2 py-1 border border-architect-gray-300 rounded" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
-                <button className="text-xs px-2 py-0.5 bg-architect-gray-100 rounded" onClick={() => setEditingIdentity(false)}>Done</button>
+                <input className="input-field" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
+                <button className="text-xs px-2 py-0.5 bg-architect-gray-100 dark:bg-gray-800 text-architect-gray-700 dark:text-gray-200 rounded hover:bg-architect-gray-200 dark:hover:bg-gray-700 transition-colors" onClick={() => setEditingIdentity(false)}>Done</button>
               </div>
             )}
           </div>
-          <button onClick={onClose} className="text-architect-gray-500 hover:text-architect-gray-700">Close</button>
+          <button onClick={onClose} className="text-architect-gray-500 hover:text-architect-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">Close</button>
         </div>
 
         {/* Body */}
         <div className="p-4 space-y-6 overflow-y-auto min-h-0 flex-1">
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-architect-gray-700 mb-1">Description</label>
-            <textarea className="w-full px-3 py-2 border border-architect-gray-300 rounded" rows={3} value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} placeholder="Project description (optional)" />
+            <label className="block text-sm font-medium text-architect-gray-700 dark:text-gray-300 mb-1">Description</label>
+            <textarea className="input-field resize-none" rows={3} value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} placeholder="Project description (optional)" />
           </div>
 
           {/* Cloud */}
           <div>
-            <div className="text-sm font-semibold text-architect-gray-900 mb-2">Cloud</div>
+            <div className="text-sm font-semibold text-architect-gray-900 dark:text-gray-100 mb-2">Cloud</div>
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-architect-gray-700 mb-1">Cloud Family</label>
+                <label className="block text-sm font-medium text-architect-gray-700 dark:text-gray-300 mb-1">Cloud Family</label>
                 <select
                   value={cloudFamily}
                   onChange={(e) => setCloudFamily(e.target.value as 'public' | 'gov')}
-                  className="w-full px-3 py-2 border border-architect-gray-300 rounded"
+                  className="select-field"
                 >
                   <option value="public">Azure Public</option>
                   <option value="gov">Azure US Government</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-architect-gray-700 mb-1">Regions & DR</label>
+                <label className="block text-sm font-medium text-architect-gray-700 dark:text-gray-300 mb-1">Regions & DR</label>
                 <AzureRegionSelector id="project-region" value={regionSelection} onChange={setRegionSelection} />
               </div>
             </div>
             <div className="mt-3 grid md:grid-cols-3 gap-3">
               <div>
-                <label className="block text-sm font-medium text-architect-gray-700 mb-1">Residency Policy</label>
+                <label className="block text-sm font-medium text-architect-gray-700 dark:text-gray-300 mb-1">Residency Policy</label>
                 <select
                   value={residencyPolicy}
                   onChange={(e)=>setResidencyPolicy(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-architect-gray-300 rounded"
+                  className="select-field"
                 >
                   <option value="no-restriction">No restriction</option>
                   <option value="in-country">In country</option>
@@ -151,23 +159,23 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                 </select>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-architect-gray-700 mb-1">Countries (ISO)</label>
+                <label className="block text-sm font-medium text-architect-gray-700 dark:text-gray-300 mb-1">Countries (ISO)</label>
                 <input
                   type="text"
                   value={residencyCountries.join(', ')}
                   onChange={(e)=>setResidencyCountries(e.target.value.split(',').map(s=>s.trim()).filter(Boolean))}
-                  className="w-full px-3 py-2 border border-architect-gray-300 rounded"
+                  className="input-field"
                   placeholder="e.g., US, CA, DE"
                   disabled={residencyPolicy === 'no-restriction' || residencyPolicy === 'in-geo'}
                 />
               </div>
             </div>
             {/* Blueprint / Constraints */}
-            <div className="mt-4 p-3 border border-architect-gray-200 rounded bg-architect-gray-50">
+            <div className="mt-4 p-3 border border-architect-gray-200 dark:border-gray-800 rounded bg-architect-gray-50 dark:bg-gray-900/60">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-semibold text-architect-gray-900">Blueprint (Constraints)</div>
-                  <div className="text-xs text-architect-gray-600">Import allow/deny lists to guide planning across this project.</div>
+                  <div className="text-sm font-semibold text-architect-gray-900 dark:text-gray-100">Blueprint (Constraints)</div>
+                  <div className="text-xs text-architect-gray-600 dark:text-gray-400">Import allow/deny lists to guide planning across this project.</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <BlueprintImportButton onImport={async (payload) => { await updateProject({ constraints: payload }) }} />
@@ -178,7 +186,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                           updateProject({ constraints: undefined })
                         }
                       }}
-                      className="text-xs px-2 py-1 rounded border border-architect-gray-300 text-architect-gray-700 hover:bg-white"
+                      className="text-xs px-2 py-1 rounded border border-architect-gray-300 dark:border-gray-700 text-architect-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 transition-colors"
                       title="Remove constraints"
                     >
                       Clear
@@ -187,14 +195,14 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                 </div>
               </div>
               {currentProject?.constraints && (
-                <div className="mt-2 text-xs text-architect-gray-700">
-                  <div><span className="text-architect-gray-500">Allowed:</span> {currentProject.constraints.allowServiceIds?.length ?? 0}</div>
-                  <div><span className="text-architect-gray-500">Denied:</span> {currentProject.constraints.denyServiceIds?.length ?? 0}</div>
-                  <div><span className="text-architect-gray-500">Locked fields:</span> {currentProject.constraints.nfrLocks?.length ?? 0}</div>
+                <div className="mt-2 text-xs text-architect-gray-700 dark:text-gray-300">
+                  <div><span className="text-architect-gray-500 dark:text-gray-400">Allowed:</span> {currentProject.constraints.allowServiceIds?.length ?? 0}</div>
+                  <div><span className="text-architect-gray-500 dark:text-gray-400">Denied:</span> {currentProject.constraints.denyServiceIds?.length ?? 0}</div>
+                  <div><span className="text-architect-gray-500 dark:text-gray-400">Locked fields:</span> {currentProject.constraints.nfrLocks?.length ?? 0}</div>
                   {currentProject.constraints.notes && (
-                    <div className="mt-1"><span className="text-architect-gray-500">Notes:</span> {currentProject.constraints.notes}</div>
+                    <div className="mt-1"><span className="text-architect-gray-500 dark:text-gray-400">Notes:</span> {currentProject.constraints.notes}</div>
                   )}
-                  <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded">
+                  <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 rounded">
                     Blueprint is active. This app will enforce all locked fields and policy constraints. Overrides must be applied via the portal and re-imported.
                   </div>
                 </div>
@@ -202,11 +210,11 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
             </div>
 
             {/* Migration to Backend */}
-            <div className="mt-4 p-3 border border-architect-gray-200 rounded bg-architect-gray-50">
+            <div className="mt-4 p-3 border border-architect-gray-200 dark:border-gray-800 rounded bg-architect-gray-50 dark:bg-gray-900/60">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-semibold text-architect-gray-900">Migrate Local Data to Backend</div>
-                  <div className="text-xs text-architect-gray-600">Upsert your local projects and NFRs into the backend database (MongoDB). Includes defaults for owner scope and user.</div>
+                  <div className="text-sm font-semibold text-architect-gray-900 dark:text-gray-100">Migrate Local Data to Backend</div>
+                  <div className="text-xs text-architect-gray-600 dark:text-gray-400">Upsert your local projects and NFRs into the backend database (MongoDB). Includes defaults for owner scope and user.</div>
                 </div>
                 <button
                   onClick={async () => {
@@ -289,7 +297,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                       setMigrationDetails((e?.stack || '').toString())
                     }
                   }}
-                  className="text-xs px-2 py-1 rounded border border-architect-gray-300 text-architect-gray-700 hover:bg-white"
+                  className="text-xs px-2 py-1 rounded border border-architect-gray-300 dark:border-gray-700 text-architect-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 transition-colors"
                 >
                   Migrate
                 </button>
@@ -306,11 +314,11 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
             </div>
 
             {/* App Log */}
-            <div className="mt-4 p-3 border border-architect-gray-200 rounded bg-architect-gray-50">
+            <div className="mt-4 p-3 border border-architect-gray-200 dark:border-gray-800 rounded bg-architect-gray-50 dark:bg-gray-900/60">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-semibold text-architect-gray-900">App Log</div>
-                  <div className="text-xs text-architect-gray-600">Quietly records background actions like pricing refreshes, blueprint imports, and migrations.</div>
+                  <div className="text-sm font-semibold text-architect-gray-900 dark:text-gray-100">App Log</div>
+                  <div className="text-xs text-architect-gray-600 dark:text-gray-400">Quietly records background actions like pricing refreshes, blueprint imports, and migrations.</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button type="button"
@@ -318,7 +326,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                       const region = regionSelection?.primary || 'default'
                       addLog('pricing-refresh', `Pricing refresh requested for region '${region}' (stubbed)`, JSON.stringify({ region }, null, 2))
                     }}
-                    className="text-xs px-2 py-1 rounded border border-architect-gray-300 text-architect-gray-700 hover:bg-white"
+                    className="text-xs px-2 py-1 rounded border border-architect-gray-300 dark:border-gray-700 text-architect-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 transition-colors"
                     title="Request pricing refresh (stubbed)"
                   >
                     Refresh pricing
@@ -346,31 +354,31 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                       }
                       doCopy()
                     }}
-                    className="text-xs px-2 py-1 rounded border border-architect-gray-300 text-architect-gray-700 hover:bg-white"
+                    className="text-xs px-2 py-1 rounded border border-architect-gray-300 dark:border-gray-700 text-architect-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 transition-colors"
                     title="Copy all entries"
                   >
                     Copy
                   </button>
                   <button type="button"
                     onClick={() => { if (confirm('Clear all log entries?')) saveLog([]) }}
-                    className="text-xs px-2 py-1 rounded border border-architect-gray-300 text-architect-gray-700 hover:bg-white"
+                    className="text-xs px-2 py-1 rounded border border-architect-gray-300 dark:border-gray-700 text-architect-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 transition-colors"
                     title="Clear log"
                   >
                     Clear
                   </button>
                 </div>
               </div>
-              <div className="mt-2 border border-architect-gray-200 rounded bg-white/60 max-h-48 overflow-y-auto">
+              <div className="mt-2 border border-architect-gray-200 dark:border-gray-800 rounded bg-white/60 dark:bg-gray-900/50 max-h-48 overflow-y-auto">
                 {appLog.length === 0 ? (
-                  <div className="p-2 text-xs text-architect-gray-500">No entries yet.</div>
+                  <div className="p-2 text-xs text-architect-gray-500 dark:text-gray-400">No entries yet.</div>
                 ) : (
-                  <ul className="divide-y divide-architect-gray-200 text-xs">
+                  <ul className="divide-y divide-architect-gray-200 dark:divide-gray-800 text-xs">
                     {appLog.map((e, idx) => (
                       <li key={`${e.ts}-${idx}`} className="p-2">
-                        <div className="font-medium text-architect-gray-900">[{e.ts}] ({e.type})</div>
-                        <div className="whitespace-pre-wrap break-words text-architect-gray-800">{e.message}</div>
+                        <div className="font-medium text-architect-gray-900 dark:text-gray-100">[{e.ts}] ({e.type})</div>
+                        <div className="whitespace-pre-wrap break-words text-architect-gray-800 dark:text-gray-300">{e.message}</div>
                         {e.details && (
-                          <pre className="mt-1 whitespace-pre-wrap break-words text-architect-gray-700">{e.details}</pre>
+                          <pre className="mt-1 whitespace-pre-wrap break-words text-architect-gray-700 dark:text-gray-400">{e.details}</pre>
                         )}
                       </li>
                     ))}
@@ -382,11 +390,11 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
 
           {/* Profile */}
           <div>
-            <div className="text-sm font-semibold text-architect-gray-900 mb-2">Profile</div>
+            <div className="text-sm font-semibold text-architect-gray-900 dark:text-gray-100 mb-2">Profile</div>
             <div className="grid md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-architect-gray-700 mb-1">Profile</label>
-                <select value={profile.level} onChange={(e) => setProfile({ ...profile, level: e.target.value as any })} className="w-full px-3 py-2 border border-architect-gray-300 rounded">
+                <label className="block text-sm font-medium text-architect-gray-700 dark:text-gray-300 mb-1">Profile</label>
+                <select value={profile.level} onChange={(e) => setProfile({ ...profile, level: e.target.value as any })} className="select-field">
                   <option value="starter">Starter</option>
                   <option value="standard">Standard</option>
                   <option value="enterprise">Enterprise</option>
@@ -394,8 +402,8 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-architect-gray-700 mb-1">Global Size</label>
-                <select value={profile.size} onChange={(e) => setProfile({ ...profile, size: e.target.value as any })} className="w-full px-3 py-2 border border-architect-gray-300 rounded">
+                <label className="block text-sm font-medium text-architect-gray-700 dark:text-gray-300 mb-1">Global Size</label>
+                <select value={profile.size} onChange={(e) => setProfile({ ...profile, size: e.target.value as any })} className="select-field">
                   <option value="XS">XS</option>
                   <option value="S">S</option>
                   <option value="M">M</option>
@@ -404,21 +412,49 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-architect-gray-700 mb-1">Criticality</label>
-                <select value={profile.criticality} onChange={(e) => setProfile({ ...profile, criticality: e.target.value as any })} className="w-full px-3 py-2 border border-architect-gray-300 rounded">
+                <label className="block text-sm font-medium text-architect-gray-700 dark:text-gray-300 mb-1">Criticality</label>
+                <select value={profile.criticality} onChange={(e) => setProfile({ ...profile, criticality: e.target.value as any })} className="select-field">
                   <option value="dev/test">Dev/Test</option>
                   <option value="prod">Production</option>
                   <option value="regulated">Regulated</option>
                 </select>
               </div>
             </div>
+            <div className="mt-4 space-y-3">
+              <div className="flex items-start gap-3 p-3 border border-architect-gray-200 dark:border-gray-800 rounded bg-architect-gray-50 dark:bg-gray-900/60">
+                <input
+                  id="waf-baseline-toggle"
+                  type="checkbox"
+                  checked={!!profile.useWafBaseline}
+                  onChange={(e) => setProfile({ ...profile, useWafBaseline: e.target.checked })}
+                  className="mt-1 h-4 w-4 text-sky-600 focus:ring-sky-500 border-architect-gray-300 dark:border-gray-700 rounded"
+                />
+                <label htmlFor="waf-baseline-toggle" className="text-xs text-architect-gray-700 dark:text-gray-300">
+                  <span className="font-semibold block text-sm text-architect-gray-900 dark:text-gray-100">Use WAF baseline</span>
+                  Automatically seed identity, networking, secrets, and observability services recommended by the Azure Well-Architected Framework.
+                </label>
+              </div>
+              <div className="flex items-start gap-3 p-3 border border-architect-gray-200 dark:border-gray-800 rounded bg-architect-gray-50 dark:bg-gray-900/60">
+                <input
+                  id="waf-dynamic-toggle"
+                  type="checkbox"
+                  checked={!!profile.wafAdaptiveAdditions}
+                  onChange={(e) => setProfile({ ...profile, wafAdaptiveAdditions: e.target.checked })}
+                  className="mt-1 h-4 w-4 text-sky-600 focus:ring-sky-500 border-architect-gray-300 dark:border-gray-700 rounded"
+                />
+                <label htmlFor="waf-dynamic-toggle" className="text-xs text-architect-gray-700 dark:text-gray-300">
+                  <span className="font-semibold block text-sm text-architect-gray-900 dark:text-gray-100">Adaptive WAF recommendations</span>
+                  Keeps the architecture in sync with captured NFRs by auto-adding or removing recommended services (e.g., private endpoints, monitoring toolchain).
+                </label>
+              </div>
+            </div>
             {/* Recipes */}
             <div className="mt-4">
-              <label className="block text-sm font-medium text-architect-gray-700 mb-1">NFR Recipe</label>
+              <label className="block text-sm font-medium text-architect-gray-700 dark:text-gray-300 mb-1">NFR Recipe</label>
               <select
                 value={recipeId}
                 onChange={(e) => setRecipeId(e.target.value)}
-                className="w-full px-3 py-2 border border-architect-gray-300 rounded"
+                className="select-field"
               >
                 <option value="">None</option>
                 {nfrRecipes.map(r => (
@@ -426,7 +462,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
                 ))}
               </select>
               {recipeId && (
-                <div className="mt-1 text-xs text-architect-gray-600">
+                <div className="mt-1 text-xs text-architect-gray-600 dark:text-gray-400">
                   {nfrRecipes.find(r => r.id === recipeId)?.description}
                 </div>
               )}
@@ -435,8 +471,8 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-architect-gray-200 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 bg-architect-gray-100 text-architect-gray-700 rounded hover:bg-architect-gray-200">Cancel</button>
+        <div className="p-4 border-t border-architect-gray-200 dark:border-gray-800 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 bg-architect-gray-100 dark:bg-gray-800 text-architect-gray-700 dark:text-gray-200 rounded hover:bg-architect-gray-200 dark:hover:bg-gray-700 transition-colors">Cancel</button>
           <button onClick={save} className="px-4 py-2 bg-azure-blue-600 text-white rounded hover:bg-azure-blue-700">Save</button>
         </div>
       </div>

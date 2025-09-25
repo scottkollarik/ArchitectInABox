@@ -3,10 +3,191 @@ import { useDrop } from 'react-dnd'
 // icons managed in outer header; none used here
 import type { AzureService, SelectedService, ProjectArchitectureState } from '../types'
 import { getServiceById, azureServiceCatalog } from '../data/azureServices'
+import { WAF_BASELINE_REASON, WAF_BASELINE_SERVICES, WAF_DYNAMIC_RULES, extractNfrAnswers } from '../data/wafGuidance'
+import type { WafRuleContext } from '../data/wafGuidance'
 import { useProject } from '../../../context/ProjectContext'
+import type { Project } from '../../../context/ProjectContext'
 // ArchitectureSection no longer used in list view
 import ServiceCard from './architecture/ServiceCard'
 import DetailsDrawer from './architecture/DetailsDrawer'
+
+const getAutoIncludeCandidate = (serviceId: string, project: Project): AzureService | undefined => {
+  const service = getServiceById(serviceId)
+  if (!service) return undefined
+  const constraints = project.constraints
+  if (constraints?.denyServiceIds && constraints.denyServiceIds.includes(serviceId)) return undefined
+  if (constraints?.allowServiceIds && constraints.allowServiceIds.length > 0 && !constraints.allowServiceIds.includes(serviceId)) {
+    return undefined
+  }
+  const family = project.cloud?.cloudFamily || 'public'
+  if (service.availability && service.availability[family] === false) return undefined
+  return service
+}
+
+const servicesWithReason = (services: SelectedService[], reason: string): string[] =>
+  services
+    .filter((service) => Array.isArray(service.requiredBy) && service.requiredBy.includes(reason))
+    .map((service) => service.id)
+
+const applyWafAutomation = ({
+  services,
+  autoSet,
+  project
+}: {
+  services: SelectedService[]
+  autoSet: Set<string>
+  project: Project
+}) => {
+  const profile = project.profile || {}
+  const baselineEnabled = profile.useWafBaseline !== false
+  const dynamicEnabled = !!profile.wafAdaptiveAdditions
+  const answers = extractNfrAnswers(project.nfrAssessment)
+  const context: WafRuleContext = { cloudFamily: project.cloud?.cloudFamily || 'public' }
+
+  let servicesClone: SelectedService[] | null = null
+  let autoClone: Set<string> | null = null
+  let changed = false
+  let autoChanged = false
+  const addedNames: string[] = []
+  const removedNames: string[] = []
+
+  const ensureServicesClone = () => {
+    if (!servicesClone) {
+      servicesClone = services.map((svc) => ({
+        ...svc,
+        requiredBy: Array.isArray(svc.requiredBy) ? [...svc.requiredBy] : []
+      }))
+    }
+    return servicesClone
+  }
+
+  const ensureAutoClone = () => {
+    if (!autoClone) {
+      autoClone = new Set(autoSet)
+    }
+    return autoClone
+  }
+
+  const ensureService = (serviceId: string, reason: string, candidateOverride?: AzureService) => {
+    const candidate = candidateOverride || getAutoIncludeCandidate(serviceId, project)
+    if (!candidate) return
+    const currentList = servicesClone || services
+    const index = currentList.findIndex((svc) => svc.id === serviceId)
+    if (index === -1) {
+      const list = ensureServicesClone()
+      const newService: SelectedService = {
+        ...candidate,
+        isAutoIncluded: true,
+        addedAt: new Date(),
+        requiredBy: [reason]
+      }
+      list.push(newService)
+      ensureAutoClone().add(serviceId)
+      addedNames.push(candidate.name)
+      autoChanged = true
+      changed = true
+    } else {
+      const existing = currentList[index]
+      const requiredBy = Array.isArray(existing.requiredBy) ? existing.requiredBy : []
+      if (!requiredBy.includes(reason)) {
+        const list = ensureServicesClone()
+        const updatedRequiredBy = [...requiredBy, reason]
+        list[index] = {
+          ...list[index],
+          requiredBy: updatedRequiredBy
+        }
+        changed = true
+      }
+    }
+  }
+
+  const dropReason = (serviceId: string, reason: string) => {
+    const baseline = servicesClone || services
+    const index = baseline.findIndex((svc) => svc.id === serviceId)
+    if (index === -1) return
+    const list = ensureServicesClone()
+    const service = list[index]
+    const requiredBy = Array.isArray(service.requiredBy) ? service.requiredBy : []
+    if (!requiredBy.includes(reason)) return
+    const filtered = requiredBy.filter((r) => r !== reason)
+    if (service.isAutoIncluded && filtered.length === 0) {
+      list.splice(index, 1)
+      const autoSetMutable = ensureAutoClone()
+      if (autoSetMutable.delete(serviceId)) {
+        autoChanged = true
+      }
+      removedNames.push(service.name)
+      changed = true
+    } else {
+      list[index] = {
+        ...service,
+        requiredBy: filtered
+      }
+      changed = true
+    }
+  }
+
+  if (baselineEnabled) {
+    WAF_BASELINE_SERVICES.forEach(({ serviceId }) => {
+      const candidate = getAutoIncludeCandidate(serviceId, project)
+      if (candidate) {
+        ensureService(serviceId, WAF_BASELINE_REASON, candidate)
+      } else {
+        dropReason(serviceId, WAF_BASELINE_REASON)
+      }
+    })
+  } else {
+    const current = servicesWithReason(services, WAF_BASELINE_REASON)
+    current.forEach((serviceId) => dropReason(serviceId, WAF_BASELINE_REASON))
+  }
+
+  WAF_DYNAMIC_RULES.forEach((rule) => {
+    const currentList = servicesClone || services
+    const tagged = servicesWithReason(currentList, rule.reason)
+    if (!dynamicEnabled) {
+      tagged.forEach((serviceId) => dropReason(serviceId, rule.reason))
+      return
+    }
+
+    const resolvedIds = rule.getServices(answers.get(rule.questionId), context)
+    const desiredIds: string[] = []
+    resolvedIds.forEach((serviceId) => {
+      const candidate = getAutoIncludeCandidate(serviceId, project)
+      if (candidate) {
+        ensureService(serviceId, rule.reason, candidate)
+        desiredIds.push(serviceId)
+      } else {
+        dropReason(serviceId, rule.reason)
+      }
+    })
+    const desiredSet = new Set(desiredIds)
+    tagged.forEach((serviceId) => {
+      if (!desiredSet.has(serviceId)) {
+        dropReason(serviceId, rule.reason)
+      }
+    })
+  })
+
+  const resultServices = changed ? (servicesClone || services) : services
+  const resultAuto = autoChanged && autoClone ? autoClone : autoSet
+
+  return {
+    services: resultServices,
+    autoSet: resultAuto,
+    added: addedNames,
+    removed: removedNames,
+    changed: changed || autoChanged
+  }
+}
+
+const setsEqual = (a: Set<string>, b: Set<string>) => {
+  if (a === b) return true
+  if (a.size !== b.size) return false
+  for (const value of a) {
+    if (!b.has(value)) return false
+  }
+  return true
+}
 
 const ArchitectureCanvas: React.FC = () => {
   const [selectedServices, setSelectedServices] = useState<SelectedService[]>([])
@@ -15,7 +196,7 @@ const ArchitectureCanvas: React.FC = () => {
   const [detailsService, setDetailsService] = useState<AzureService | null>(null)
   const { currentProject, setArchitecture } = useProject()
 
-  const addNotification = (message: string, type: 'info' | 'warning' | 'success' = 'info') => {
+  const addNotification = useCallback((message: string, type: 'info' | 'warning' | 'success' = 'info') => {
     const id = Date.now().toString()
     const payload = { id, message, type } as const
     setNotifications(prev => [...prev, payload])
@@ -23,7 +204,7 @@ const ArchitectureCanvas: React.FC = () => {
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id))
     }, 5000)
-  }
+  }, [])
 
   // Root drop: accept any service and route to its category
   const [{ isOver: isOverRoot }, rootDrop] = useDrop(() => ({
@@ -176,6 +357,32 @@ const ArchitectureCanvas: React.FC = () => {
     return groups
   }, [selectedServices])
 
+  useEffect(() => {
+    if (!currentProject) return
+    const result = applyWafAutomation({
+      services: selectedServices,
+      autoSet: autoIncludedServices,
+      project: currentProject
+    })
+
+    if (!result.changed) return
+
+    if (result.services !== selectedServices) {
+      setSelectedServices(result.services)
+    }
+
+    if (!setsEqual(autoIncludedServices, result.autoSet)) {
+      setAutoIncludedServices(result.autoSet)
+    }
+
+    if (result.added.length > 0) {
+      addNotification(`WAF automation added: ${result.added.join(', ')}`, 'info')
+    }
+    if (result.removed.length > 0) {
+      addNotification(`WAF automation removed: ${result.removed.join(', ')}`, 'info')
+    }
+  }, [currentProject, selectedServices, autoIncludedServices, addNotification])
+
   // Persist to project when selection changes
   useEffect(() => {
     if (!currentProject) return
@@ -188,7 +395,6 @@ const ArchitectureCanvas: React.FC = () => {
       overrides: currentProject.architecture?.overrides || {}
     }
     setArchitecture(arch)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedServices, currentProject?.id])
 
   // Rehydrate from project on mount/change
@@ -213,7 +419,6 @@ const ArchitectureCanvas: React.FC = () => {
     })
     setSelectedServices(unique)
     setAutoIncludedServices(auto)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProject?.id])
 
   const categoryLabel = (category: string) => {
@@ -260,8 +465,15 @@ const ArchitectureCanvas: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Drop Zone (container wraps category lanes) */}
-      <div ref={rootDrop} className={`drop-zone min-h-48 p-4 rounded-lg transition-all duration-200 ${isOverRoot ? 'border-azure-blue-500 bg-azure-blue-50' : 'border-architect-gray-300 bg-white'} border`}>
-        <div className="space-y-4">
+      <div
+        ref={rootDrop}
+        className={`drop-zone min-h-48 rounded-lg transition-all duration-200 border ${
+          isOverRoot
+            ? 'border-azure-blue-500 bg-azure-blue-50 dark:bg-azure-blue-900/30'
+            : 'border-architect-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900'
+        }`}
+      >
+        <div className="space-y-4 p-4">
           {Object.keys(azureServiceCatalog).map((catKey) => {
             const list = servicesByCategory[catKey] || []
             return (
@@ -277,7 +489,9 @@ const ArchitectureCanvas: React.FC = () => {
             )
           })}
           {selectedServices.length === 0 && (
-            <div className="text-center text-xs text-architect-gray-500">Drag a service by its top bar and drop into a matching section.</div>
+            <div className="text-center text-xs text-architect-gray-500 dark:text-gray-400">
+              Drag a service by its top bar and drop into a matching section.
+            </div>
           )}
         </div>
       </div>
@@ -308,13 +522,13 @@ const CategoryDropLane: React.FC<{
       ref={drop}
       className={`rounded-lg p-3 min-h-[84px] border transition ${
         isOver && canDrop
-          ? 'border-azure-blue-500 bg-azure-blue-50 shadow-inner'
-          : 'border-architect-gray-200 bg-white'
+          ? 'border-azure-blue-500 bg-azure-blue-50 dark:bg-azure-blue-900/30 shadow-inner'
+          : 'border-architect-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900'
       }`}
     >
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-sm font-semibold tracking-wide text-architect-gray-900">{title}</h4>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-architect-gray-100 text-architect-gray-600">{services.length}</span>
+        <h4 className="text-sm font-semibold tracking-wide text-architect-gray-900 dark:text-gray-100">{title}</h4>
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-architect-gray-100 text-architect-gray-600 dark:bg-gray-800 dark:text-gray-300">{services.length}</span>
       </div>
       {services.length > 0 ? (
         <div className="space-y-1">
@@ -323,7 +537,9 @@ const CategoryDropLane: React.FC<{
           ))}
         </div>
       ) : (
-        <div className={`text-xs text-center py-6 rounded ${canDrop ? 'text-azure-blue-700' : 'text-architect-gray-500'}`}>
+        <div className={`text-xs text-center py-6 rounded ${
+          canDrop ? 'text-azure-blue-700 dark:text-azure-blue-300' : 'text-architect-gray-500 dark:text-gray-400'
+        }`}>
           {canDrop ? `Drop ${title} services here` : `No ${title} yet`}
         </div>
       )}

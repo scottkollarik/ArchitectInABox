@@ -92,8 +92,13 @@ const CloudArchitecturePage: React.FC = () => {
 
   const alignment = useMemo(() => {
     try {
-      const nfr = summarizeNfr((currentProject as any)?.nfrAssessment as NFRSection[] | undefined)
-      const recs = generateRecommendations(nfr) || []
+      const nfrSections = (currentProject as any)?.nfrAssessment as NFRSection[] | undefined
+      const nfr = summarizeNfr(nfrSections)
+      const recs = generateRecommendations(nfr, {
+        sections: nfrSections,
+        profile: currentProject?.profile,
+        cloud: currentProject?.cloud
+      }) || []
       const matched = recs.filter(s => s && selectedIds.has(s.id))
       const missing = recs.filter(s => s && !selectedIds.has(s.id))
       const pct = recs.length ? Math.round((matched.length / recs.length) * 100) : 100
@@ -157,12 +162,12 @@ const CloudArchitecturePage: React.FC = () => {
       {/* Full-width info strip spanning 12 columns */}
       <div className="col-span-12">
         {/* Unified bordered container so the border continues from tab around strip and down to content */}
-        <div className="border border-azure-blue-300 rounded-lg rounded-tl-none shadow-sm overflow-hidden">
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg rounded-tl-none shadow-sm overflow-hidden">
           {/* Strip header */}
-          <div className="bg-azure-blue-50 px-4 py-2">
+          <div className="bg-gray-100 dark:bg-gray-700 px-4 py-2 border-b border-gray-300 dark:border-gray-600">
             <div className="flex items-center gap-3 min-w-0">
             <div
-              className="text-base md:text-lg font-semibold text-azure-blue-900"
+              className="text-base md:text-lg font-semibold text-gray-900 dark:text-white"
               id="ca-strip-title"
               style={{ opacity: 1 }}
             >
@@ -183,7 +188,7 @@ const CloudArchitecturePage: React.FC = () => {
               ))}
             </div>
             <div className="ml-auto">
-              <button onClick={() => setShowNfr(!showNfr)} className="text-xs px-2 py-1 rounded border border-azure-blue-300 text-azure-blue-700 hover:bg-white">
+              <button onClick={() => setShowNfr(!showNfr)} className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700">
                 {showNfr ? 'Hide Requirements' : 'Show Requirements'}
               </button>
             </div>
@@ -192,7 +197,7 @@ const CloudArchitecturePage: React.FC = () => {
           </div>
           {/* NFR content inside the same bordered container */}
           {showNfr && (
-            <div className="bg-white">
+            <div className="bg-white dark:bg-gray-800">
               <div className="pt-4 pb-5 px-5">
                 <NFRAssessmentForm />
               </div>
@@ -204,10 +209,10 @@ const CloudArchitecturePage: React.FC = () => {
       {/* Two-column layout below the strip */}
         {/* Left: Services */}
         <div className="col-span-7 space-y-4">
-          <div className="bg-white rounded-lg shadow-lg border border-architect-gray-200">
-            <div className="px-4 py-3 border-b border-architect-gray-200 flex items-center justify-between">
-              <h2 className="text-sm font-semibold tracking-wide text-architect-gray-900">Azure Services</h2>
-              <span className="text-[11px] text-architect-gray-500">Browse & drag to build</span>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-architect-gray-200 dark:border-gray-700">
+            <div className="px-4 py-3 border-b border-architect-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <h2 className="text-sm font-semibold tracking-wide text-architect-gray-900 dark:text-white">Azure Services</h2>
+              <span className="text-[11px] text-architect-gray-500 dark:text-gray-400">Browse & drag to build</span>
             </div>
             <div className="p-4">
               <AzureServicesBrowser />
@@ -218,32 +223,32 @@ const CloudArchitecturePage: React.FC = () => {
         {/* Right: Your Architecture (sticky, scrollable) */}
         <div className="col-span-5">
           <div className="sticky top-2">
-            <div className="bg-white rounded-lg shadow-lg border border-architect-gray-200">
-              <div className="px-4 py-3 border-b border-architect-gray-200">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-architect-gray-200 dark:border-gray-700">
+              <div className="px-4 py-3 border-b border-architect-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <h2 className="text-sm font-semibold tracking-wide text-architect-gray-900 whitespace-nowrap">Your Services</h2>
+                  <h2 className="text-sm font-semibold tracking-wide text-architect-gray-900 dark:text-white whitespace-nowrap">Your Services</h2>
                   <button
                     onClick={() => {
                       try { window.dispatchEvent(new CustomEvent('alignment-report-open')) } catch {}
                     }}
-                    className="text-[11px] px-2 py-0.5 rounded border border-architect-gray-300 text-architect-gray-700 hover:bg-architect-gray-50"
+                    className="text-[11px] px-2 py-0.5 rounded border border-architect-gray-300 dark:border-gray-600 text-architect-gray-700 dark:text-gray-300 hover:bg-architect-gray-50 dark:hover:bg-gray-700"
                     title="View alignment report"
                   >
                     View Report
                   </button>
                   {servicesCount === 0 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded border border-architect-gray-300 text-architect-gray-700" title="Drag items from the left and drop below">Drop below</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded border border-architect-gray-300 dark:border-gray-600 text-architect-gray-700 dark:text-gray-300 dark:bg-gray-800" title="Drag items from the left and drop below">Drop below</span>
                   )}
                   <div className="ml-auto flex items-center gap-2 flex-wrap">
-                    <div className="text-xs text-architect-gray-700">{servicesCount} services</div>
-                    <div className="hidden md:flex items-center gap-1 text-xs px-2 py-1 rounded border border-architect-gray-300" title="Alignment compares selected services against NFR-based recommendations">
+                    <div className="text-xs text-architect-gray-700 dark:text-gray-300">{servicesCount} services</div>
+                    <div className="hidden md:flex items-center gap-1 text-xs px-2 py-1 rounded border border-architect-gray-300 dark:border-gray-600 dark:bg-gray-800" title="Alignment compares selected services against NFR-based recommendations">
                       <span className={`font-semibold ${alignment.pct === 100 ? 'text-green-700' : alignment.pct >= 60 ? 'text-amber-700' : 'text-red-700'}`}>{alignment.pct}%</span>
-                      <span className="text-architect-gray-600">alignment</span>
+                      <span className="text-architect-gray-600 dark:text-gray-400">alignment</span>
                     </div>
-                    <div className="hidden sm:flex items-center gap-1 text-xs px-2 py-1 rounded border border-green-300 text-green-800">
-                      <CurrencyDollarIcon className="w-4 h-4 text-green-700" />
+                    <div className="hidden sm:flex items-center gap-1 text-xs px-2 py-1 rounded border border-green-300 dark:border-green-600 text-green-800 dark:text-green-300 dark:bg-green-900">
+                      <CurrencyDollarIcon className="w-4 h-4 text-green-700 dark:text-green-400" />
                       <span className="font-semibold">${estimatedMonthlyCost.toFixed(0)}</span>
-                      <span className="text-green-700">/month</span>
+                      <span className="text-green-700 dark:text-green-400">/month</span>
                     </div>
                     <button
                       onClick={() => {
@@ -316,11 +321,11 @@ const CloudArchitecturePage: React.FC = () => {
                     <div className="pt-1 pb-2">
                       <button
                         onClick={() => setShowMessages(v => !v)}
-                        className="text-[11px] px-2 py-0.5 rounded border border-architect-gray-300 text-architect-gray-700 hover:bg-architect-gray-50"
+                        className="text-[11px] px-2 py-0.5 rounded border border-architect-gray-300 dark:border-gray-600 text-architect-gray-700 dark:text-gray-300 hover:bg-architect-gray-50 dark:hover:bg-gray-700"
                       >
                         {showMessages ? 'Hide Messages' : 'Show Messages'}
                         {!showMessages && (
-                          <span className="ml-1 inline-flex items-center justify-center w-4 h-4 text-[10px] rounded-full bg-azure-blue-600 text-white align-middle">{messages.length}</span>
+                          <span className="ml-1 inline-flex items-center justify-center w-4 h-4 text-[10px] rounded-full bg-slate-600 dark:bg-slate-500 text-white align-middle">{messages.length}</span>
                         )}
                       </button>
                       {showMessages && (
@@ -340,7 +345,7 @@ const CloudArchitecturePage: React.FC = () => {
                   )}
                 </div>
               </div>
-              <div className="p-4 overflow-y-auto max-h-[calc(100vh-220px)]">
+              <div className="overflow-y-auto max-h-[calc(100vh-220px)]">
                 <ArchitectureCanvas />
               </div>
             </div>

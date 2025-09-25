@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { useAuth } from '../auth/EntraAuthProvider'
+import { useTheme } from '../hooks/useTheme'
 
 const AVATARS = [
   { id: 'blueprint', label: 'Blueprint Buddy', glyph: '📐' },
@@ -25,6 +26,7 @@ const setAvatarPreference = (key: string, value: string) => {
 
 const UserBadge: React.FC = () => {
   const { displayName, email, logout, isLoading, login, isAuthenticated, objectId } = useAuth()
+  const { theme, setTheme } = useTheme()
   const [open, setOpen] = useState(false)
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
@@ -34,11 +36,13 @@ const UserBadge: React.FC = () => {
     return 'aib-avatar-dev'
   }, [objectId, email])
 
-  const preferredAvatarId = useMemo(() => {
-    return getAvatarPreference(badgeKey) || AVATARS[0].id
+  const [avatarId, setAvatarId] = useState<string>(() => getAvatarPreference(badgeKey) || AVATARS[0].id)
+
+  useEffect(() => {
+    setAvatarId(getAvatarPreference(badgeKey) || AVATARS[0].id)
   }, [badgeKey])
 
-  const activeAvatar = AVATARS.find(a => a.id === preferredAvatarId) || AVATARS[0]
+  const activeAvatar = AVATARS.find(a => a.id === avatarId) || AVATARS[0]
 
   const initials = useMemo(() => {
     const name = displayName || email || 'Architect'
@@ -49,6 +53,7 @@ const UserBadge: React.FC = () => {
 
   const handleSelectAvatar = (id: string) => {
     setAvatarPreference(badgeKey, id)
+    setAvatarId(id)
     setShowAvatarPicker(false)
   }
 
@@ -71,22 +76,22 @@ const UserBadge: React.FC = () => {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-64 bg-white border border-architect-gray-200 rounded-lg shadow-lg z-50">
-          <div className="px-4 py-3 border-b border-architect-gray-100">
+        <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-900 border border-architect-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 transition-colors">
+          <div className="px-4 py-3 border-b border-architect-gray-100 dark:border-gray-800">
             <div className="flex items-center gap-3">
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-azure-blue-100 text-lg">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-azure-blue-100 dark:bg-azure-blue-900/60 text-lg">
                 {activeAvatar.glyph || initials}
               </div>
               <div className="min-w-0">
-                <div className="font-semibold text-architect-gray-900 truncate">{label}</div>
-                <div className="text-xs text-architect-gray-500 truncate">{mail}</div>
+                <div className="font-semibold text-architect-gray-900 dark:text-gray-100 truncate">{label}</div>
+                <div className="text-xs text-architect-gray-500 dark:text-gray-400 truncate">{mail}</div>
               </div>
             </div>
           </div>
 
           <div className="py-2">
             <button
-              className="w-full text-left px-4 py-2 text-sm text-architect-gray-700 hover:bg-architect-gray-50"
+              className="w-full text-left px-4 py-2 text-sm text-architect-gray-700 dark:text-gray-300 hover:bg-architect-gray-50 dark:hover:bg-gray-800 transition-colors"
               onClick={() => {
                 setShowAvatarPicker(true)
                 setOpen(false)
@@ -95,17 +100,26 @@ const UserBadge: React.FC = () => {
               Change avatar
             </button>
             <button
-              className="w-full text-left px-4 py-2 text-sm text-architect-gray-700 hover:bg-architect-gray-50"
-              onClick={() => {
-                setOpen(false)
-                alert('Profile settings coming soon!')
-              }}
+              className={`w-full text-left px-4 py-2 text-sm text-architect-gray-700 dark:text-gray-300 hover:bg-architect-gray-50 dark:hover:bg-gray-800 transition-colors ${theme === 'light' ? 'bg-architect-gray-50 dark:bg-gray-800/60' : ''}`}
+              onClick={() => { setOpen(false); setTheme('light') }}
             >
-              Profile settings
+              ☀️ Light theme
+            </button>
+            <button
+              className={`w-full text-left px-4 py-2 text-sm text-architect-gray-700 dark:text-gray-300 hover:bg-architect-gray-50 dark:hover:bg-gray-800 transition-colors ${theme === 'dark' ? 'bg-architect-gray-50 dark:bg-gray-800/60' : ''}`}
+              onClick={() => { setOpen(false); setTheme('dark') }}
+            >
+              🌙 Dark theme
+            </button>
+            <button
+              className={`w-full text-left px-4 py-2 text-sm text-architect-gray-700 dark:text-gray-300 hover:bg-architect-gray-50 dark:hover:bg-gray-800 transition-colors ${theme === 'system' ? 'bg-architect-gray-50 dark:bg-gray-800/60' : ''}`}
+              onClick={() => { setOpen(false); setTheme('system') }}
+            >
+              🖥️ System theme
             </button>
           </div>
 
-          <div className="border-t border-architect-gray-100 px-4 py-3">
+          <div className="border-t border-architect-gray-100 dark:border-gray-800 px-4 py-3">
             <button
               disabled={isLoading}
               className="w-full px-3 py-2 text-sm text-white bg-azure-blue-600 rounded-md hover:bg-azure-blue-700 disabled:opacity-50"
@@ -129,26 +143,26 @@ const UserBadge: React.FC = () => {
       )}
 
       {showAvatarPicker && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
-            <div className="p-4 border-b border-architect-gray-100 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-architect-gray-900">Choose an avatar</h3>
-              <button onClick={() => setShowAvatarPicker(false)} className="text-architect-gray-400 hover:text-architect-gray-600">✕</button>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-sm mx-4 border border-architect-gray-200 dark:border-gray-700 transition-colors">
+            <div className="p-4 border-b border-architect-gray-100 dark:border-gray-800 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-architect-gray-900 dark:text-gray-100">Choose an avatar</h3>
+              <button onClick={() => setShowAvatarPicker(false)} className="text-architect-gray-400 hover:text-architect-gray-600 dark:hover:text-gray-300">✕</button>
             </div>
             <div className="grid grid-cols-3 gap-3 p-4">
               {AVATARS.map(avatar => (
                 <button
                   key={avatar.id}
                   onClick={() => handleSelectAvatar(avatar.id)}
-                  className={`flex flex-col items-center gap-2 px-3 py-2 border rounded-lg transition ${avatar.id === activeAvatar.id ? 'border-azure-blue-500 bg-azure-blue-50' : 'border-architect-gray-200 hover:border-azure-blue-300'}`}
+                  className={`flex flex-col items-center gap-2 px-3 py-2 border rounded-lg transition ${avatar.id === activeAvatar.id ? 'border-azure-blue-500 bg-azure-blue-50 dark:bg-azure-blue-900/40' : 'border-architect-gray-200 dark:border-gray-700 hover:border-azure-blue-300 dark:hover:border-azure-blue-500/60'}`}
                 >
                   <span className="text-2xl">{avatar.glyph}</span>
-                  <span className="text-xs text-architect-gray-700 text-center leading-tight">{avatar.label}</span>
+                  <span className="text-xs text-architect-gray-700 dark:text-gray-200 text-center leading-tight">{avatar.label}</span>
                 </button>
               ))}
             </div>
-            <div className="px-4 py-3 border-t border-architect-gray-100 text-right">
-              <button onClick={() => setShowAvatarPicker(false)} className="px-3 py-1.5 text-sm text-architect-gray-600 hover:text-architect-gray-800">Close</button>
+            <div className="px-4 py-3 border-t border-architect-gray-100 dark:border-gray-800 text-right">
+              <button onClick={() => setShowAvatarPicker(false)} className="px-3 py-1.5 text-sm text-architect-gray-600 dark:text-gray-300 hover:text-architect-gray-800 dark:hover:text-gray-100">Close</button>
             </div>
           </div>
         </div>

@@ -420,9 +420,9 @@ const NFRAssessmentForm: React.FC = () => {
       <div className="mt-1 space-y-4">
         {/* Existing Cards */}
         {cards.map((card, cardIndex) => (
-          <div key={cardIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-medium text-gray-700">{cardTitle || 'Item'} {cardIndex + 1}</h4>
+          <div key={cardIndex} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700">
+              <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200">{cardTitle || 'Item'} {cardIndex + 1}</h4>
               <button type="button" onClick={() => removeCard(sectionId, questionId, cardIndex)} className="text-red-600 hover:text-red-800 text-sm flex items-center space-x-1">
                 <TrashIcon className="h-4 w-4" />
                 <span>Remove</span>
@@ -438,13 +438,13 @@ const NFRAssessmentForm: React.FC = () => {
                 const options = (field.options || []).filter((o: string) => !lock || lock.mode !== 'policy-only' || !lock.allowedValues?.length || lock.allowedValues.includes(o))
                 return (
                   <div key={field.id}>
-                    <label htmlFor={cardFieldInputId} className="block text-xs font-medium text-gray-700 mb-1">{field.label}</label>
+                    <label htmlFor={cardFieldInputId} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{field.label}</label>
                     {field.type === 'select' ? (
                       <select
                         id={cardFieldInputId}
                         value={fieldValue}
                         onChange={(e) => updateCardField(sectionId, questionId, cardIndex, field.id, e.target.value)}
-                        className="inline-block max-w-xs px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500"
+                        className="inline-block max-w-xs px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                         disabled={!!lock && lock.mode === 'locked'}
                       >
                         <option value="">Select...</option>
@@ -466,7 +466,7 @@ const NFRAssessmentForm: React.FC = () => {
                         type={field.type}
                         value={fieldValue}
                         onChange={(e) => updateCardField(sectionId, questionId, cardIndex, field.id, e.target.value)}
-                        className="block max-w-xs px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500"
+                        className="block max-w-xs px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                         placeholder={field.placeholder}
                       />
                     )}
@@ -480,7 +480,7 @@ const NFRAssessmentForm: React.FC = () => {
         {/* Composer for new card */}
         {cards.length < maxCards ? (
           <div className="border border-dashed border-gray-300 rounded-lg p-4">
-            <div className="text-sm font-medium text-gray-700 mb-2">{cardTitle || 'Item'} (new)</div>
+            <div className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{cardTitle || 'Item'} (new)</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {fields.map((field: any) => {
                 const fieldId = `${inputId}-composer-${field.id}`
@@ -490,13 +490,13 @@ const NFRAssessmentForm: React.FC = () => {
                 const options = (field.options || []).filter((o: string) => !lock || lock.mode !== 'policy-only' || !lock.allowedValues?.length || lock.allowedValues.includes(o))
                 return (
                   <div key={field.id}>
-                    <label htmlFor={fieldId} className="block text-xs font-medium text-gray-700 mb-1">{field.label}</label>
+                    <label htmlFor={fieldId} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{field.label}</label>
                     {field.type === 'select' ? (
                       <select
                         id={fieldId}
                         value={val || ''}
                         onChange={(e) => setDraftField(field.id, e.target.value)}
-                        className="inline-block max-w-xs px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500"
+                        className="inline-block max-w-xs px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                         disabled={!!lock && lock.mode === 'locked'}
                       >
                         <option value="">Select...</option>
@@ -518,7 +518,7 @@ const NFRAssessmentForm: React.FC = () => {
                         type={field.type}
                         value={val || ''}
                         onChange={(e) => setDraftField(field.id, e.target.value)}
-                        className="block max-w-xs px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500"
+                        className="block max-w-xs px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                         placeholder={field.placeholder}
                       />
                     )}
@@ -527,13 +527,13 @@ const NFRAssessmentForm: React.FC = () => {
               })}
             </div>
             <div className="mt-3">
-              <button type="button" onClick={handleAdd} className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-azure-blue-600 text-white hover:bg-azure-blue-700">
+              <button type="button" onClick={handleAdd} className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-azure-blue-600 dark:bg-azure-blue-700 text-white hover:bg-azure-blue-700 dark:hover:bg-azure-blue-800">
                 {addButtonText || 'Add Item'}
               </button>
             </div>
           </div>
         ) : (
-          <p className="text-xs text-gray-500 text-center">Maximum {maxCards} items reached</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">Maximum {maxCards} items reached</p>
         )}
       </div>
     )
@@ -570,7 +570,7 @@ const NFRAssessmentForm: React.FC = () => {
             id={inputId}
             value={question.value || ''}
             onChange={(e) => updateQuestion(sectionId, question.id, e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             rows={3}
             placeholder={question.placeholder}
           />
@@ -612,7 +612,7 @@ const NFRAssessmentForm: React.FC = () => {
             type="text"
             value={question.value || ''}
             onChange={(e) => updateQuestion(sectionId, question.id, e.target.value)}
-            className="mt-1 block px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm max-w-xs"
+            className="mt-1 block px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm max-w-xs"
             placeholder={question.placeholder}
           />
         )
@@ -624,7 +624,7 @@ const NFRAssessmentForm: React.FC = () => {
             type="number"
             value={question.value || ''}
             onChange={(e) => updateQuestion(sectionId, question.id, e.target.value)}
-            className="mt-1 block px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm max-w-xs"
+            className="mt-1 block px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm max-w-xs"
             placeholder={question.placeholder}
           />
         )
@@ -639,7 +639,7 @@ const NFRAssessmentForm: React.FC = () => {
             id={inputId}
             value={question.value || ''}
             onChange={(e) => updateQuestion(sectionId, question.id, e.target.value)}
-            className="mt-1 inline-block px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm max-w-xs"
+            className="mt-1 inline-block px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm max-w-xs"
             disabled={!!lock && lock.mode === 'locked'}
           >
             <option value="">Select an option...</option>
@@ -665,9 +665,9 @@ const NFRAssessmentForm: React.FC = () => {
                       : currentValues.filter(v => v !== option)
                     updateQuestion(sectionId, question.id, newValues)
                   }}
-                  className="h-4 w-4 text-azure-blue-600 focus:ring-azure-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-azure-blue-600 focus:ring-azure-blue-500 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded"
                 />
-                <span className="ml-2 text-sm text-gray-700">{option}</span>
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-200">{option}</span>
               </label>
             ))}
           </div>
@@ -709,7 +709,7 @@ const NFRAssessmentForm: React.FC = () => {
                   const w = widthFor(field.id)
                   return (
                     <div key={field.id} className={w}>
-                      <label htmlFor={fieldInputId} className="block text-[11px] font-medium text-gray-700 mb-0.5">
+                      <label htmlFor={fieldInputId} className="block text-[11px] font-medium text-gray-700 dark:text-gray-300 mb-0.5">
                         {field.label}
                       </label>
                       {field.type === 'select' ? (
@@ -717,7 +717,7 @@ const NFRAssessmentForm: React.FC = () => {
                           id={fieldInputId}
                           value={fieldValue}
                           onChange={(e) => updateCompoundField(sectionId, question.id, field.id, e.target.value)}
-                          className="block w-full px-2 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm"
+                        className="block w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm"
                         >
                           <option value="">Select...</option>
                           {field.options?.map((option) => (
@@ -730,7 +730,7 @@ const NFRAssessmentForm: React.FC = () => {
                           type={field.type}
                           value={fieldValue}
                           onChange={(e) => updateCompoundField(sectionId, question.id, field.id, e.target.value)}
-                          className="block w-full px-2 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm"
+                        className="block w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm"
                           placeholder={field.placeholder}
                         />
                       )}
@@ -764,9 +764,9 @@ const NFRAssessmentForm: React.FC = () => {
                 const fieldInputId = `${inputId}-${field.id}`
                 return (
                   <div key={field.id}>
-                    <label htmlFor={fieldInputId} className="block text-xs font-medium text-gray-700 mb-1">
+                    <label htmlFor={fieldInputId} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {field.label}
-                      {field.suffix && <span className="text-gray-500 ml-1">({field.suffix})</span>}
+                      {field.suffix && <span className="text-gray-500 dark:text-gray-400 ml-1">({field.suffix})</span>}
                     </label>
                     {field.type === 'select' ? (
                       <select
@@ -871,7 +871,7 @@ const NFRAssessmentForm: React.FC = () => {
             type="text"
             value={question.value || ''}
             onChange={(e) => updateQuestion(sectionId, question.id, e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             placeholder={question.placeholder}
           />
         )
@@ -884,14 +884,14 @@ const NFRAssessmentForm: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Overall Progress */}
-      <div className="bg-azure-blue-50 border border-azure-blue-200 rounded-lg p-4">
+      <div className="bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-medium text-azure-blue-900">Overall Progress</h3>
-          <span className="text-sm font-medium text-azure-blue-700">{overallPercentage}%</span>
+          <h3 className="text-sm font-medium text-gray-900 dark:text-white">Overall Progress</h3>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{overallPercentage}%</span>
         </div>
-        <div className="w-full bg-azure-blue-200 rounded-full h-2">
-          <div 
-            className="bg-azure-blue-600 h-2 rounded-full transition-all duration-300" 
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          <div
+            className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300" 
             style={{ width: `${overallPercentage}%` }}
           />
         </div>
@@ -904,11 +904,11 @@ const NFRAssessmentForm: React.FC = () => {
         const hasAnswers = completion.required.completed > 0 || completion.optional.completed > 0
 
         return (
-          <div key={section.id} id={`nfr-${section.id}`} className="border border-gray-200 rounded-lg overflow-hidden">
+          <div key={section.id} id={`nfr-${section.id}`} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
             {/* Section Header */}
             <button
               onClick={() => toggleSection(section.id)}
-              className="w-full px-4 py-3 bg-gray-50 text-left hover:bg-gray-100 transition-colors flex items-center justify-between"
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between"
             >
               <div className="flex items-center space-x-3">
                 {section.isCollapsed ? (
@@ -919,7 +919,7 @@ const NFRAssessmentForm: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     {section.icon && <span className="text-base" aria-hidden>{section.icon}</span>}
-                    <h3 className="font-medium text-gray-900">{section.title}</h3>
+                    <h3 className="font-medium text-gray-900 dark:text-white">{section.title}</h3>
                     {(() => {
                       const reqTotal = section.questions.filter(q => q.isRequired).length
                       const reqDone = section.questions.filter(q => q.isRequired && q.isCompleted).length
@@ -927,17 +927,17 @@ const NFRAssessmentForm: React.FC = () => {
                       const optDone = section.questions.filter(q => q.isOptional && q.isCompleted).length
                       return (
                         <>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded border border-architect-gray-300 text-architect-gray-700" title="Required questions completed">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border border-architect-gray-300 dark:border-gray-600 text-architect-gray-700 dark:text-gray-300" title="Required questions completed">
                             Req {reqDone}/{reqTotal}
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded border border-architect-gray-300 text-architect-gray-700" title="Optional questions answered">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border border-architect-gray-300 dark:border-gray-600 text-architect-gray-700 dark:text-gray-300" title="Optional questions answered">
                             Opt {optDone}/{optTotal}
                           </span>
                         </>
                       )
                     })()}
                   </div>
-                  <p className="text-sm text-gray-500">{section.description}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{section.description}</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
@@ -945,12 +945,12 @@ const NFRAssessmentForm: React.FC = () => {
                   const pct = Math.round((completion.required.completed / (completion.required.total || 1)) * 100) || 0
                   // Alternate mapping: 0 red, 1–33 red, 34–66 amber, 67–99 light‑green, 100 green
                   const colorClasses = pct === 100
-                    ? 'bg-green-100 text-green-800 border-green-300'
+                    ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300 border-green-300 dark:border-green-600'
                     : pct >= 67
-                      ? 'bg-green-50 text-green-700 border-green-300'
+                      ? 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 border-green-300 dark:border-green-600'
                       : pct >= 34
-                        ? 'bg-amber-50 text-amber-700 border-amber-300'
-                        : 'bg-red-50 text-red-700 border-red-300'
+                        ? 'bg-amber-50 dark:bg-amber-900 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-600'
+                        : 'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 border-red-300 dark:border-red-600'
                   return (
                     <span className={`text-xs px-2 py-0.5 rounded-full border ${colorClasses}`}>{pct}%</span>
                   )
@@ -967,14 +967,14 @@ const NFRAssessmentForm: React.FC = () => {
 
             {/* Section Content */}
             {!section.isCollapsed && (
-              <div className="p-4 space-y-4">
+              <div className="p-4 space-y-4 bg-white dark:bg-gray-900">
                 {section.questions.map((question) => (
                   <div key={question.id} className="space-y-2">
                     {(() => {
                       const forId = getQuestionLabelTargetId(section.id, question)
                       const title = (
                         <span className="inline-flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-700">
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
                             {question.text}
                             {question.isRequired && <span className="text-red-500 ml-1">*</span>}
                           </span>
@@ -988,7 +988,7 @@ const NFRAssessmentForm: React.FC = () => {
                         </span>
                       )
                       const helper = question.helpText ? (
-                        <p className="text-xs text-gray-500 mt-1">{question.helpText}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{question.helpText}</p>
                       ) : null
                       return forId ? (
                         <label htmlFor={forId} className="block">

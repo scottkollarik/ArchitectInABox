@@ -149,35 +149,35 @@ const AzureServicesBrowser: React.FC = () => {
           }
           
           return (
-            <div key={categoryId} className="border border-architect-gray-200 rounded-lg bg-white shadow-sm">
+            <div key={categoryId} className="border border-architect-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 shadow-sm transition-colors">
               {/* Category Header */}
               <div
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-architect-gray-50 transition-colors duration-200"
+                className="flex items-center justify-between p-4 cursor-pointer hover:bg-architect-gray-50 dark:hover:bg-gray-800 transition-colors duration-200"
                 onClick={() => toggleCategory(categoryId)}
               >
                 <div className="flex items-center space-x-3">
                   <span className="text-2xl">{category.icon}</span>
                   <div>
-                    <h3 className="font-semibold text-architect-gray-900">{category.name}</h3>
-                    <p className="text-sm text-architect-gray-600">{category.description}</p>
+                    <h3 className="font-semibold text-architect-gray-900 dark:text-gray-100">{category.name}</h3>
+                    <p className="text-sm text-architect-gray-600 dark:text-gray-400">{category.description}</p>
                   </div>
                 </div>
                 
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm text-architect-gray-500 bg-architect-gray-100 px-2 py-1 rounded-full">
+                  <span className="text-sm text-architect-gray-500 dark:text-gray-300 bg-architect-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full transition-colors">
                     {filteredServices.length} services
                   </span>
                   {isExpanded ? (
-                    <ChevronDownIcon className="w-5 h-5 text-architect-gray-400" />
+                    <ChevronDownIcon className="w-5 h-5 text-architect-gray-400 dark:text-gray-500" />
                   ) : (
-                    <ChevronRightIcon className="w-5 h-5 text-architect-gray-400" />
+                    <ChevronRightIcon className="w-5 h-5 text-architect-gray-400 dark:text-gray-500" />
                   )}
                 </div>
               </div>
               
               {/* Category Services */}
               {isExpanded && (
-                <div className="border-t border-architect-gray-200 bg-architect-gray-50 p-4">
+                <div className="border-t border-architect-gray-200 dark:border-gray-800 bg-architect-gray-50 dark:bg-gray-950 p-4 transition-colors">
                   <div className="grid gap-3">
                     {filteredServices.map((service) => (
                       <DraggableServiceCard
@@ -243,10 +243,10 @@ const DraggableServiceCard: React.FC<{ service: AzureService; size?: SizingLevel
 
   const getArchitectureRoleColor = (role: string) => {
     switch (role) {
-      case 'core': return 'text-green-600'
-      case 'supporting': return 'text-blue-600'
-      case 'optional': return 'text-gray-600'
-      default: return 'text-gray-600'
+      case 'core': return 'text-green-600 dark:text-green-300'
+      case 'supporting': return 'text-blue-600 dark:text-blue-300'
+      case 'optional': return 'text-gray-600 dark:text-gray-300'
+      default: return 'text-gray-600 dark:text-gray-300'
     }
   }
 
@@ -256,26 +256,29 @@ const DraggableServiceCard: React.FC<{ service: AzureService; size?: SizingLevel
       className={`service-node ${isDragging ? 'opacity-80 shadow-lg scale-[0.99]' : 'opacity-100'} transition`}
       style={{ cursor: 'default' }}
     >
-      {/* Drag bar */}
+      {/* Drag bar - integrated as top edge */}
       <div
         ref={barRef}
-        className={`h-5 w-full flex items-center justify-center px-2 rounded-t ${barColorFor(service.category)} cursor-grab active:cursor-grabbing`}
+        className={`h-4 w-full flex items-center justify-center ${barColorFor(service.category)} cursor-grab active:cursor-grabbing border-b border-black/10 dark:border-white/10`}
         title="Drag to canvas"
       >
         <div className="flex gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-white/60 shadow-inner" />
-          <span className="w-1.5 h-1.5 rounded-full bg-white/60 shadow-inner" />
-          <span className="w-1.5 h-1.5 rounded-full bg-white/60 shadow-inner" />
-          <span className="w-1.5 h-1.5 rounded-full bg-white/60 shadow-inner ml-1" />
-          <span className="w-1.5 h-1.5 rounded-full bg-white/60 shadow-inner" />
-          <span className="w-1.5 h-1.5 rounded-full bg-white/60 shadow-inner" />
+          <span className="w-1.5 h-1.5 bg-white/80 dark:bg-black/60 rounded-full shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] border border-black/20 dark:border-white/20" />
+          <span className="w-1.5 h-1.5 bg-white/80 dark:bg-black/60 rounded-full shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] border border-black/20 dark:border-white/20" />
+          <span className="w-1.5 h-1.5 bg-white/80 dark:bg-black/60 rounded-full shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] border border-black/20 dark:border-white/20" />
+          <span className="w-1 opacity-0" />
+          <span className="w-1.5 h-1.5 bg-white/80 dark:bg-black/60 rounded-full shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] border border-black/20 dark:border-white/20" />
+          <span className="w-1.5 h-1.5 bg-white/80 dark:bg-black/60 rounded-full shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] border border-black/20 dark:border-white/20" />
+          <span className="w-1.5 h-1.5 bg-white/80 dark:bg-black/60 rounded-full shadow-[inset_0_1px_1px_rgba(0,0,0,0.3)] border border-black/20 dark:border-white/20" />
         </div>
       </div>
+      {/* Card Content */}
+      <div className="p-3">
       {/* Service Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2 mb-1">
-            <h4 className="font-semibold text-sm text-architect-gray-900 truncate">
+            <h4 className="font-semibold text-sm text-architect-gray-900 dark:text-white truncate">
               {service.name}
             </h4>
             <span className={getTierBadgeClass(service.tier)}>
@@ -287,7 +290,7 @@ const DraggableServiceCard: React.FC<{ service: AzureService; size?: SizingLevel
               {service.architectureRole}
             </span>
             {service.tags && service.tags.length > 0 && (
-              <span className="text-architect-gray-500">
+              <span className="text-architect-gray-500 dark:text-gray-400">
                 • {service.tags.slice(0, 2).join(', ')}
                 {service.tags.length > 2 && ` +${service.tags.length - 2}`}
               </span>
@@ -297,7 +300,7 @@ const DraggableServiceCard: React.FC<{ service: AzureService; size?: SizingLevel
       </div>
 
       {/* Service Description */}
-      <p className="text-xs text-architect-gray-600 mb-3 line-clamp-2">
+      <p className="text-xs text-architect-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
         {service.description}
       </p>
 
@@ -348,9 +351,9 @@ const DraggableServiceCard: React.FC<{ service: AzureService; size?: SizingLevel
             .filter(Boolean) as string[]
           if (names.length === 0) return null
           return (
-            <div className="text-xs text-blue-700">
-              <span className="font-medium">Often paired with:</span>{' '}
-              <span className="text-blue-600">
+            <div className="text-xs text-architect-gray-600 dark:text-gray-300">
+              <span className="font-medium text-architect-gray-700 dark:text-gray-100">Often paired with:</span>{' '}
+              <span className="text-sky-600 dark:text-sky-300">
                 {names.slice(0, 3).join(', ')}{names.length > 3 ? `, +${names.length - 3} more` : ''}
               </span>
             </div>
@@ -386,21 +389,22 @@ const DraggableServiceCard: React.FC<{ service: AzureService; size?: SizingLevel
           </button>
         </div>
       </div>
+      </div>
     </div>
   )
 }
 
 function barColorFor(category: string) {
   switch (category) {
-    case 'compute': return 'bg-blue-100'
-    case 'databases': return 'bg-green-100'
-    case 'object-storage': return 'bg-emerald-100'
-    case 'networking': return 'bg-indigo-100'
-    case 'security': return 'bg-red-100'
-    case 'messaging': return 'bg-orange-100'
-    case 'monitoring': return 'bg-purple-100'
-    case 'identity': return 'bg-teal-100'
-    default: return 'bg-architect-gray-50'
+    case 'compute': return 'bg-cyan-700 dark:bg-cyan-800'
+    case 'databases': return 'bg-emerald-700 dark:bg-emerald-800'
+    case 'object-storage': return 'bg-teal-700 dark:bg-teal-800'
+    case 'networking': return 'bg-indigo-700 dark:bg-indigo-800'
+    case 'security': return 'bg-red-700 dark:bg-red-800'
+    case 'messaging': return 'bg-orange-700 dark:bg-orange-800'
+    case 'monitoring': return 'bg-purple-700 dark:bg-purple-800'
+    case 'identity': return 'bg-slate-700 dark:bg-slate-800'
+    default: return 'bg-gray-700 dark:bg-gray-800'
   }
 }
 

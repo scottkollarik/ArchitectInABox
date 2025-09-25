@@ -362,4 +362,6 @@ export interface ProjectProfile {
   criticality: 'dev/test' | 'prod' | 'regulated'
   // Optional NFR defaults bundle
   recipe?: string
+  useWafBaseline?: boolean
+  wafAdaptiveAdditions?: boolean
 }
