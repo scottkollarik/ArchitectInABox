@@ -1,7 +1,11 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useProject } from '../../../context/ProjectContext'
 import { generateRecommendations, getServiceById } from '../data/azureServices'
 import type { NFRSection } from '../types'
+
+const DEFAULT_WIDTH = 520
+const MIN_WIDTH = 420
+const MAX_WIDTH = 760
 
 type CostEntry = {
   id: string
@@ -18,6 +22,55 @@ const AlignmentReportDrawer: React.FC<{ open: boolean; onClose: () => void }>=({
   const { currentProject } = useProject()
   const architectureItems = currentProject?.architecture?.items || []
   const [activeTab, setActiveTab] = useState<'general' | 'cost'>('general')
+  const profileKey = currentProject?.profile?.level || 'default'
+  const storageKey = currentProject?.id ? `alignment-drawer-width:${currentProject.id}:${profileKey}` : null
+  const [drawerWidth, setDrawerWidth] = useState<number>(DEFAULT_WIDTH)
+  const drawerWidthRef = useRef(drawerWidth)
+
+  useEffect(() => {
+    drawerWidthRef.current = drawerWidth
+  }, [drawerWidth])
+
+  useEffect(() => {
+    if (!storageKey || !open) return
+    try {
+      const stored = localStorage.getItem(storageKey)
+      if (stored) {
+        const parsed = parseInt(stored, 10)
+        if (Number.isFinite(parsed)) {
+          setDrawerWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, parsed)))
+        }
+      }
+    } catch {}
+  }, [storageKey, open])
+
+  const handleResizeStart = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
+    event.preventDefault()
+    const startX = event.clientX
+    const startWidth = drawerWidthRef.current
+    const originalUserSelect = document.body.style.userSelect
+    document.body.style.userSelect = 'none'
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const delta = startX - moveEvent.clientX
+      const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + delta))
+      drawerWidthRef.current = next
+      setDrawerWidth(next)
+    }
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.userSelect = originalUserSelect
+      if (storageKey) {
+        try { localStorage.setItem(storageKey, String(drawerWidthRef.current)) } catch {}
+      }
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
   const sections = (currentProject?.nfrAssessment as NFRSection[] | undefined) || []
   const summarizeNfr = (sections?: NFRSection[]) => {
     if (!sections) return {}
@@ -207,29 +260,38 @@ const AlignmentReportDrawer: React.FC<{ open: boolean; onClose: () => void }>=({
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-full max-w-xl bg-white dark:bg-gray-950 shadow-2xl border-l border-architect-gray-200 dark:border-gray-800 flex flex-col">
-        <div className="p-4 border-b border-architect-gray-200 dark:border-gray-800 flex items-center justify-between">
-          <div>
-            <div className="text-xs text-architect-gray-500 dark:text-gray-400">Report</div>
-            <h3 className="text-lg font-semibold text-architect-gray-900 dark:text-gray-100">Alignment Overview</h3>
+      <div
+        className="absolute right-0 top-0 h-full bg-white dark:bg-gray-950 shadow-2xl border-l border-architect-gray-200 dark:border-gray-800"
+        style={{ width: drawerWidth, minWidth: MIN_WIDTH, maxWidth: MAX_WIDTH }}
+      >
+        <div className="relative flex h-full flex-col">
+          <div
+            role="presentation"
+            onMouseDown={handleResizeStart}
+            className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize bg-transparent hover:bg-azure-blue-500/20 transition-colors"
+          />
+          <div className="p-4 border-b border-architect-gray-200 dark:border-gray-800 flex items-center justify-between">
+            <div>
+              <div className="text-xs text-architect-gray-500 dark:text-gray-400">Report</div>
+              <h3 className="text-lg font-semibold text-architect-gray-900 dark:text-gray-100">Alignment Overview</h3>
+            </div>
+            <button onClick={onClose} className="text-architect-gray-600 dark:text-gray-400 hover:text-architect-gray-800 dark:hover:text-gray-200 transition-colors">Close</button>
           </div>
-          <button onClick={onClose} className="text-architect-gray-600 dark:text-gray-400 hover:text-architect-gray-800 dark:hover:text-gray-200 transition-colors">Close</button>
-        </div>
 
-        <div className="px-4 pt-3 pb-2 border-b border-architect-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
-          <div className="inline-flex rounded-md bg-architect-gray-100 dark:bg-gray-900/60 p-0.5">
-            <button type="button" className={tabButtonClasses('general')} onClick={() => setActiveTab('general')}>
-              General
-            </button>
-            <button type="button" className={tabButtonClasses('cost')} onClick={() => setActiveTab('cost')}>
-              Cost Breakdown
-            </button>
+          <div className="px-4 pt-3 pb-2 border-b border-architect-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+            <div className="inline-flex rounded-md bg-architect-gray-100 dark:bg-gray-900/60 p-0.5">
+              <button type="button" className={tabButtonClasses('general')} onClick={() => setActiveTab('general')}>
+                General
+              </button>
+              <button type="button" className={tabButtonClasses('cost')} onClick={() => setActiveTab('cost')}>
+                Cost Breakdown
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div className="flex-1 overflow-y-auto bg-architect-gray-50/60 dark:bg-gray-950 p-4 space-y-4">
-          {activeTab === 'general' ? (
-            <>
+          <div className="flex-1 overflow-y-auto bg-architect-gray-50/60 dark:bg-gray-950 p-4 space-y-4">
+            {activeTab === 'general' ? (
+              <>
               {/* Workload & Traffic */}
               <div className="border border-architect-gray-200 dark:border-gray-800 rounded p-3 bg-white dark:bg-gray-900/70">
                 <div className="text-sm font-semibold text-architect-gray-900 dark:text-gray-100 mb-1">Workload & Traffic</div>
@@ -470,6 +532,7 @@ const AlignmentReportDrawer: React.FC<{ open: boolean; onClose: () => void }>=({
               )}
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
