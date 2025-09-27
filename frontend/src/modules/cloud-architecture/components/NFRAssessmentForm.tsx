@@ -348,27 +348,25 @@ const NFRAssessmentForm: React.FC = () => {
   }, [])
 
   const updateCardField = useCallback((sectionId: string, questionId: string, cardIndex: number, fieldId: string, value: any) => {
-    setSections(prev => prev.map(section =>
-      section.id === sectionId
-        ? {
-            ...section,
-            questions: section.questions.map(question =>
-              question.id === questionId
-                ? {
-                    ...question,
-                    value: Array.isArray(question.value)
-                      ? question.value.map((card, index) =>
-                          index === cardIndex
-                            ? { ...card, [fieldId]: value }
-                            : card
-                        )
-                      : [{ [fieldId]: value }]
-                  }
-                : question
-            )
+    setSections(prev => prev.map(section => {
+      if (section.id !== sectionId) return section
+      return {
+        ...section,
+        questions: section.questions.map(question => {
+          if (question.id !== questionId) return question
+          if (!Array.isArray(question.value) || cardIndex < 0 || cardIndex >= question.value.length) {
+            return question
           }
-        : section
-    ))
+          const updatedCards = question.value.map((card, index) =>
+            index === cardIndex ? { ...card, [fieldId]: value } : card
+          )
+          return {
+            ...question,
+            value: updatedCards
+          }
+        })
+      }
+    }))
   }, [])
 
   // Inline component for card-list with composer UX
@@ -414,6 +412,59 @@ const NFRAssessmentForm: React.FC = () => {
       [fields]
     )
 
+    const topRowFieldIds = React.useMemo(() => new Set(['name', 'model-type', 'dataset-origin', 'consistency', 'size-estimate']), [])
+
+    const getSelectWidth = (fieldId: string) => {
+      switch (fieldId) {
+        case 'model-type':
+          return 'w-[13rem]'
+        case 'dataset-origin':
+          return 'w-[13rem]'
+        case 'consistency':
+          return 'w-[12.25rem]'
+        case 'workload-pattern':
+          return 'w-[12.5rem]'
+        case 'relational-ha':
+          return 'w-[12.75rem]'
+        case 'access-pattern':
+          return 'w-[13.25rem]'
+        case 'graph-patterns':
+          return 'w-[13.25rem]'
+        default:
+          return 'w-full'
+      }
+    }
+
+    const getNumericWidths = (fieldId: string) => {
+      switch (fieldId) {
+        case 'size-estimate':
+          return { input: 'w-24', unit: 'w-16' }
+        case 'document-size':
+          return { input: 'w-20', unit: 'w-16' }
+        case 'throughput-requirement':
+          return { input: 'w-24', unit: 'w-16' }
+        case 'ingest-rate':
+          return { input: 'w-24', unit: 'w-16' }
+        case 'retention-window':
+          return { input: 'w-24', unit: 'w-16' }
+        case 'file-size':
+          return { input: 'w-24', unit: 'w-16' }
+        default:
+          return { input: undefined, unit: undefined }
+      }
+    }
+
+    const getTextInputWidth = (fieldId: string) => {
+      switch (fieldId) {
+        case 'partition-key':
+          return 'w-[12.75rem]'
+        case 'graph-scale':
+          return 'w-[13.5rem]'
+        default:
+          return 'w-full'
+      }
+    }
+
     const resolveConditionalValue = React.useCallback((fieldId: string, values: Record<string, any>) => {
       if (!values) return undefined
       const direct = values[fieldId]
@@ -440,7 +491,20 @@ const NFRAssessmentForm: React.FC = () => {
       if (field.id === 'dataset-origin' && datasetOriginDefault && value === datasetOriginDefault && sizeFieldConfig) {
         updateCardField(sectionId, questionId, cardIdx, 'size-estimate', getNumericDefault(sizeFieldConfig))
       }
-    }, [datasetOriginDefault, getNumericDefault, questionId, sectionId, sizeFieldConfig, updateCardField])
+      if (field.id === 'model-type') {
+        const nextValues = { ...(cards[cardIdx] || {}), [field.id]: value }
+        fields.forEach((candidate: any) => {
+          if (candidate.id === field.id) return
+          if (candidate.showWhen && candidate.showWhen.field === 'model-type') {
+            const shouldShow = shouldRenderField(candidate, nextValues)
+            if (!shouldShow) {
+              const resetVal = getFieldDefault(candidate)
+              updateCardField(sectionId, questionId, cardIdx, candidate.id, resetVal)
+            }
+          }
+        })
+      }
+    }, [cards, datasetOriginDefault, fields, getFieldDefault, getNumericDefault, questionId, sectionId, shouldRenderField, sizeFieldConfig, updateCardField])
 
     React.useEffect(() => {
       setExpandedCards(prev => {
@@ -459,6 +523,10 @@ const NFRAssessmentForm: React.FC = () => {
       cards.forEach((card, index) => {
         if (!card) return
         const currentOrigin = card['dataset-origin']
+        if (currentOrigin === 'Greenfield (0 existing data)' && datasetOriginField) {
+          updateCardField(sectionId, questionId, index, 'dataset-origin', datasetOriginField.defaultValue ?? 'Greenfield')
+          return
+        }
         const sizeVal = card['size-estimate']
         const hasSizeValue = (() => {
           if (!sizeVal) return false
@@ -497,10 +565,32 @@ const NFRAssessmentForm: React.FC = () => {
         }))
         return
       }
-      setDraft(prev => ({ ...prev, [id]: val }))
+
+      setDraft(prev => {
+        const next = { ...prev, [id]: val }
+        if (id === 'model-type') {
+          fields.forEach((candidate: any) => {
+            if (candidate.id === id) return
+            if (candidate.showWhen && candidate.showWhen.field === 'model-type') {
+              const shouldShow = shouldRenderField(candidate, next)
+              if (!shouldShow) {
+                next[candidate.id] = getFieldDefault(candidate)
+              }
+            }
+          })
+        }
+        return next
+      })
     }
 
+    const canAdd = React.useMemo(() => {
+      const name = draft['name']
+      const modelType = draft['model-type']
+      return Boolean(name && typeof name === 'string' && name.trim() !== '' && modelType)
+    }, [draft])
+
     const handleAdd = () => {
+      if (!canAdd) return
       const newCard: Record<string, any> = {}
       fields.forEach((f: any) => {
         const val = draft[f.id]
@@ -527,7 +617,7 @@ const NFRAssessmentForm: React.FC = () => {
     }
 
     const formatSizeEstimate = (val: any, origin?: string) => {
-      const defaultGreenfield = datasetOriginDefault || 'Greenfield (0 existing data)'
+      const defaultGreenfield = datasetOriginDefault || 'Greenfield'
       if (origin && origin === defaultGreenfield) return 'No existing data'
       if (!val) return 'Size unknown'
       if (typeof val === 'object') {
@@ -602,55 +692,149 @@ const NFRAssessmentForm: React.FC = () => {
 
             {(expandedCards[cardIndex] ?? false) && (
               <div className="border-t border-indigo-100 dark:border-indigo-700/60 px-4 py-4 bg-white/90 dark:bg-gray-900/70">
-                <div className="grid grid-cols-1 gap-3">
-                  {fields.map((field: any) => {
-                    if (!shouldRenderField(field, card)) return null
+                {(() => {
+                  const topFields = fields.filter((field: any) => topRowFieldIds.has(field.id) && shouldRenderField(field, card))
+                  const bodyFields = fields.filter((field: any) => !topRowFieldIds.has(field.id) && shouldRenderField(field, card))
+
+                  const renderFieldBlock = (field: any, containerClass: string) => {
                     const rawFieldValue = card[field.id]
                     const fieldValue = rawFieldValue !== undefined ? rawFieldValue : getFieldDefault(field)
                     const cardFieldInputId = `${inputId}-card-${cardIndex}-${field.id}`
                     const path = (field.id === 'consistency') ? `data.models.${cardIndex}.consistency` : ''
                     const lock = path ? matchLock(path) : undefined
                     const options = (field.options || []).filter((o: string) => !lock || lock.mode !== 'policy-only' || !lock.allowedValues?.length || lock.allowedValues.includes(o))
+                    const selectWidthClass = getSelectWidth(field.id)
+                    const numericWidths = getNumericWidths(field.id)
+                    const textWidthClass = getTextInputWidth(field.id)
                     return (
-                      <div key={field.id}>
-                        <label htmlFor={cardFieldInputId} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{field.label}</label>
+                      <div key={field.id} className={containerClass}>
+                        <label htmlFor={cardFieldInputId} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          {field.label}
+                        </label>
                         {field.type === 'select' ? (
-                      <select
-                        id={cardFieldInputId}
-                        value={(fieldValue ?? '') as string}
-                        onChange={(e) => handleSelectChange(field, cardIndex, e.target.value)}
-                        className="inline-block max-w-xs px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        disabled={!!lock && lock.mode === 'locked'}
-                      >
-                        <option value="">Select...</option>
-                        {options.map((option: string) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    ) : field.type === 'numeric-with-units' ? (
-                      <NumericWithUnits
-                        id={cardFieldInputId}
-                        value={parseNumericWithUnit(fieldValue, field.defaultUnit || (field.units?.[0] || 'GB'))}
-                        onChange={(val) => updateCardField(sectionId, questionId, cardIndex, field.id, val)}
-                        units={field.units || ['units']}
-                        defaultUnit={field.defaultUnit}
-                        inputWidthClass={field.id === 'size-estimate' ? 'w-28' : undefined}
-                        unitWidthClass={field.id === 'size-estimate' ? 'w-16' : undefined}
-                      />
-                    ) : (
-                      <input
-                        id={cardFieldInputId}
-                        type={field.type}
-                        value={(fieldValue ?? '') as string}
-                        onChange={(e) => updateCardField(sectionId, questionId, cardIndex, field.id, e.target.value)}
-                        className="block max-w-xs px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        placeholder={field.placeholder}
-                      />
-                    )}
-                  </div>
-                )
-              })}
-                </div>
+                          <select
+                            id={cardFieldInputId}
+                            value={(fieldValue ?? '') as string}
+                            onChange={(e) => handleSelectChange(field, cardIndex, e.target.value)}
+                            className={`inline-block ${selectWidthClass} px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
+                            disabled={!!lock && lock.mode === 'locked'}
+                          >
+                            <option value="">Select...</option>
+                            {options.map((option: string) => (
+                              <option key={option} value={option}>{option}</option>
+                            ))}
+                          </select>
+                        ) : field.type === 'numeric-with-units' ? (
+                          <NumericWithUnits
+                            id={cardFieldInputId}
+                            value={parseNumericWithUnit(fieldValue, field.defaultUnit || (field.units?.[0] || 'GB'))}
+                            onChange={(val) => updateCardField(sectionId, questionId, cardIndex, field.id, val)}
+                            units={field.units || ['units']}
+                            defaultUnit={field.defaultUnit}
+                            inputWidthClass={numericWidths.input}
+                            unitWidthClass={numericWidths.unit}
+                          />
+                        ) : (
+                          <input
+                            id={cardFieldInputId}
+                            type={field.type}
+                            value={(fieldValue ?? '') as string}
+                            onChange={(e) => updateCardField(sectionId, questionId, cardIndex, field.id, e.target.value)}
+                            className={`block ${textWidthClass} px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
+                            placeholder={field.placeholder}
+                          />
+                        )}
+                      </div>
+                    )
+                  }
+
+                  const nameField = topFields.find((field: any) => field.id === 'name')
+                  const secondaryTopFields = topFields.filter((field: any) => field.id !== 'name')
+
+                  const topRow = topFields.length ? (
+                    <div className="space-y-3">
+                      {nameField ? (
+                        <div className="w-full max-w-2xl">
+                          {renderFieldBlock(nameField, 'w-full')}
+                        </div>
+                      ) : null}
+                      {secondaryTopFields.length ? (
+                        <div className="flex flex-wrap gap-4">
+                          {secondaryTopFields.map((field: any) => {
+                            const widthClass = (() => {
+                              switch (field.id) {
+                                case 'model-type':
+                                  return 'flex-shrink-0 w-[12.5rem]'
+                                case 'dataset-origin':
+                                  return 'flex-shrink-0 w-[12.5rem]'
+                                case 'consistency':
+                                  return 'flex-shrink-0 w-[11.75rem]'
+                                case 'size-estimate':
+                                  return 'flex-shrink-0 w-[9.75rem]'
+                                case 'workload-pattern':
+                                  return 'flex-shrink-0 w-[12.75rem]'
+                                case 'relational-ha':
+                                  return 'flex-shrink-0 w-[13rem]'
+                              }
+                              return 'flex-shrink-0 w-[11.75rem]'
+                            })()
+                            return renderFieldBlock(field, widthClass)
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null
+
+                  const sqlPair = bodyFields.length > 0 && bodyFields.every((field: any) => ['workload-pattern', 'relational-ha'].includes(field.id))
+
+                  const body = bodyFields.length ? (
+                    <div className={`mt-4 flex flex-wrap ${sqlPair ? 'gap-4' : 'gap-3'}`}>
+                      {bodyFields.map((field: any) => {
+                        let widthClass = 'flex-1 min-w-[14rem] max-w-lg'
+                        switch (field.id) {
+                          case 'partition-key':
+                            widthClass = 'flex-shrink-0 w-[12.75rem]'
+                            break
+                          case 'document-size':
+                            widthClass = 'flex-shrink-0 w-[10.75rem]'
+                            break
+                          case 'throughput-requirement':
+                            widthClass = 'flex-shrink-0 w-[11.5rem]'
+                            break
+                          case 'ingest-rate':
+                            widthClass = 'flex-shrink-0 w-[11.5rem]'
+                            break
+                          case 'retention-window':
+                            widthClass = 'flex-shrink-0 w-[11rem]'
+                            break
+                          case 'workload-pattern':
+                            widthClass = 'flex-shrink-0 w-[10.75rem]'
+                            break
+                          case 'relational-ha':
+                            widthClass = 'flex-shrink-0 w-[11.25rem]'
+                            break
+                          case 'file-size':
+                            widthClass = 'flex-shrink-0 w-[12rem]'
+                            break
+                          case 'graph-scale':
+                            widthClass = 'flex-shrink-0 w-[13.5rem]'
+                            break
+                          case 'graph-patterns':
+                            widthClass = 'flex-shrink-0 w-[13rem]'
+                            break
+                        }
+                        return renderFieldBlock(field, widthClass)
+                      })}
+                    </div>
+                  ) : null
+
+                  return (
+                    <>
+                      {topRow}
+                      {body}
+                    </>
+                  )
+                })()}
               </div>
             )}
             </div>
@@ -661,24 +845,29 @@ const NFRAssessmentForm: React.FC = () => {
         {cards.length < maxCards ? (
           <div className="border border-dashed border-indigo-200 dark:border-indigo-700/50 rounded-xl p-4 bg-indigo-50/40 dark:bg-indigo-900/20 transition-colors">
             <div className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{cardTitle || 'Item'} (new)</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {fields.map((field: any) => {
-                if (!shouldRenderField(field, draft)) return null
+            {(() => {
+              const topFields = fields.filter((field: any) => topRowFieldIds.has(field.id) && shouldRenderField(field, draft))
+              const bodyFields = fields.filter((field: any) => !topRowFieldIds.has(field.id) && shouldRenderField(field, draft))
+
+              const renderDraftField = (field: any, containerClass: string) => {
                 const fieldId = `${inputId}-composer-${field.id}`
                 const currentVal = draft[field.id]
                 const val = currentVal !== undefined ? currentVal : getFieldDefault(field)
                 const path = (field.id === 'consistency') ? `data.models.new.consistency` : ''
                 const lock = path ? matchLock(path) : undefined
                 const options = (field.options || []).filter((o: string) => !lock || lock.mode !== 'policy-only' || !lock.allowedValues?.length || lock.allowedValues.includes(o))
+                const selectWidthClass = getSelectWidth(field.id)
+                const numericWidths = getNumericWidths(field.id)
+                const textWidthClass = getTextInputWidth(field.id)
                 return (
-                  <div key={field.id}>
+                  <div key={field.id} className={containerClass}>
                     <label htmlFor={fieldId} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{field.label}</label>
                     {field.type === 'select' ? (
                       <select
                         id={fieldId}
                         value={(val ?? '') as string}
                         onChange={(e) => setDraftField(field.id, e.target.value)}
-                        className="inline-block max-w-xs px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        className={`inline-block ${selectWidthClass} px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                         disabled={!!lock && lock.mode === 'locked'}
                       >
                         <option value="">Select...</option>
@@ -693,8 +882,8 @@ const NFRAssessmentForm: React.FC = () => {
                         onChange={(v) => setDraftField(field.id, v)}
                         units={field.units || ['units']}
                         defaultUnit={field.defaultUnit}
-                        inputWidthClass={field.id === 'size-estimate' ? 'w-28' : undefined}
-                        unitWidthClass={field.id === 'size-estimate' ? 'w-16' : undefined}
+                        inputWidthClass={numericWidths.input}
+                        unitWidthClass={numericWidths.unit}
                       />
                     ) : (
                       <input
@@ -702,16 +891,108 @@ const NFRAssessmentForm: React.FC = () => {
                         type={field.type}
                         value={(val ?? '') as string}
                         onChange={(e) => setDraftField(field.id, e.target.value)}
-                        className="block max-w-xs px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        className={`block ${textWidthClass} px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                         placeholder={field.placeholder}
                       />
                     )}
                   </div>
                 )
-              })}
-            </div>
+              }
+
+              const composerSqlPair = bodyFields.length > 0 && bodyFields.every((field: any) => ['workload-pattern', 'relational-ha'].includes(field.id))
+
+              return (
+                <>
+                  {topFields.length ? (
+                    <div className="space-y-3">
+                      {(() => {
+                        const nameDraftField = topFields.find((field: any) => field.id === 'name')
+                        return nameDraftField ? (
+                          <div className="w-full max-w-2xl">
+                            {renderDraftField(nameDraftField, 'w-full')}
+                          </div>
+                        ) : null
+                      })()}
+                      {(() => {
+                        const secondaryDraftFields = topFields.filter((field: any) => field.id !== 'name')
+                        if (!secondaryDraftFields.length) return null
+                        return (
+                          <div className="flex flex-wrap gap-4">
+                            {secondaryDraftFields.map((field: any) => {
+                              const widthClass = (() => {
+                                switch (field.id) {
+                                  case 'model-type':
+                                    return 'flex-shrink-0 w-[12.5rem]'
+                                  case 'dataset-origin':
+                                    return 'flex-shrink-0 w-[12.5rem]'
+                                  case 'consistency':
+                                    return 'flex-shrink-0 w-[11.75rem]'
+                                  case 'size-estimate':
+                                    return 'flex-shrink-0 w-[9.75rem]'
+                                  case 'workload-pattern':
+                                    return 'flex-shrink-0 w-[12.75rem]'
+                                  case 'relational-ha':
+                                    return 'flex-shrink-0 w-[13rem]'
+                                }
+                                return 'flex-shrink-0 w-[11.75rem]'
+                              })()
+                              return renderDraftField(field, widthClass)
+                            })}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  ) : null}
+                  {bodyFields.length ? (
+                    <div className={`mt-4 flex flex-wrap ${composerSqlPair ? 'gap-4' : 'gap-3'}`}>
+                      {bodyFields.map((field: any) => {
+                        let widthClass = 'flex-1 min-w-[14rem] max-w-lg'
+                        switch (field.id) {
+                          case 'partition-key':
+                            widthClass = 'flex-shrink-0 w-[12.75rem]'
+                            break
+                          case 'document-size':
+                            widthClass = 'flex-shrink-0 w-[10.75rem]'
+                            break
+                          case 'throughput-requirement':
+                            widthClass = 'flex-shrink-0 w-[11.5rem]'
+                            break
+                          case 'ingest-rate':
+                            widthClass = 'flex-shrink-0 w-[11.5rem]'
+                            break
+                          case 'retention-window':
+                            widthClass = 'flex-shrink-0 w-[11rem]'
+                            break
+                          case 'workload-pattern':
+                            widthClass = 'flex-shrink-0 w-[12.75rem]'
+                            break
+                          case 'relational-ha':
+                            widthClass = 'flex-shrink-0 w-[13rem]'
+                            break
+                          case 'file-size':
+                            widthClass = 'flex-shrink-0 w-[12rem]'
+                            break
+                          case 'graph-scale':
+                            widthClass = 'flex-shrink-0 w-[13.5rem]'
+                            break
+                          case 'graph-patterns':
+                            widthClass = 'flex-shrink-0 w-[13rem]'
+                            break
+                        }
+                        return renderDraftField(field, widthClass)
+                      })}
+                    </div>
+                  ) : null}
+                </>
+              )
+            })()}
             <div className="mt-3">
-              <button type="button" onClick={handleAdd} className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-azure-blue-600 dark:bg-azure-blue-700 text-white hover:bg-azure-blue-700 dark:hover:bg-azure-blue-800">
+              <button
+                type="button"
+                onClick={handleAdd}
+                disabled={!canAdd}
+                className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md ${canAdd ? 'bg-azure-blue-600 dark:bg-azure-blue-700 text-white hover:bg-azure-blue-700 dark:hover:bg-azure-blue-800' : 'bg-architect-gray-200 dark:bg-gray-700 text-architect-gray-500 dark:text-gray-400 cursor-not-allowed'}`}
+              >
                 {addButtonText || 'Add Item'}
               </button>
             </div>
@@ -1171,9 +1452,12 @@ const NFRAssessmentForm: React.FC = () => {
                           {modelCount}
                         </span>
                       ) : null
+                      const labelTypography = question.id === 'data-models'
+                        ? 'text-base font-semibold'
+                        : 'text-sm font-medium'
                       const title = (
                         <span className="inline-flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                          <span className={`${labelTypography} text-gray-700 dark:text-gray-200`}>
                             {question.text}
                             {question.isRequired && <span className="text-red-500 ml-1">*</span>}
                           </span>

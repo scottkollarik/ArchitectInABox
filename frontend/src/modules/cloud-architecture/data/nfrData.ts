@@ -198,14 +198,148 @@ export const nfrSections: NFRSection[] = [
     isCollapsed: true,
     questions: [
       {
-        id: 'global-settings',
-        text: 'Global Defaults and Policies',
+        id: 'data-models',
+        text: 'Data model inventory',
+        inputType: 'card-list',
+        isRequired: true,
+        isOptional: false,
+        isCompleted: false,
+        architectureImpact: 'critical',
+        helpText: 'Capture each dataset before layering on defaults or resilience policies. Pick a model type to reveal tailored sizing and operational fields.',
+        infoPopover: {
+          title: 'Why define data models?',
+          description: 'Capturing each logical dataset lets the platform recommend the right storage engines, optimize throughput, and estimate storage growth independently.',
+          bullets: [
+            { label: 'Workload fit', text: 'Relational, NoSQL, time-series, or blob storage each have different trade-offs for latency and consistency.' },
+            { label: 'Sizing accuracy', text: 'Knowing dataset size and expected growth drives SKU selection, partitioning, and cost forecasting.' },
+            { label: 'Compliance & sharing', text: 'Different datasets may have different residency, retention, or access rules.' },
+            { label: 'Starting context', text: 'Greenfield indicates a net-new dataset; other options help us plan migration timelines and seeding strategies.' }
+          ]
+        },
+        cardConfig: {
+          addButtonText: 'Add Data Model',
+          cardTitle: 'Data Source',
+          maxCards: 5,
+          fields: [
+            { id: 'name', label: 'Data Source Name', type: 'text', placeholder: 'e.g., User profiles, Order history' },
+            { id: 'model-type', label: 'Data Model', type: 'select', options: ['Relational (SQL)', 'Document (NoSQL)', 'Key-value', 'Time-series', 'Graph', 'Blob/File storage'] },
+            {
+              id: 'dataset-origin',
+              label: 'Starting dataset context',
+              type: 'select',
+              options: [
+                'Greenfield',
+                'Migrating existing workload',
+                'Seeding partner/vendor data',
+                'Pre-provisioned reference data'
+              ],
+              defaultValue: 'Greenfield'
+            },
+            { id: 'consistency', label: 'Consistency Requirements', type: 'select', options: ['Strong (ACID)', 'Bounded-staleness', 'Session', 'Eventual'] },
+            {
+              id: 'size-estimate',
+              label: 'Existing dataset size',
+              type: 'numeric-with-units',
+              units: ['MB', 'GB', 'TB'],
+              defaultUnit: 'GB',
+              placeholder: '250',
+              showWhen: { field: 'dataset-origin', notEquals: 'Greenfield' }
+            },
+            {
+              id: 'workload-pattern',
+              label: 'Workload pattern',
+              type: 'select',
+              options: ['Transactional (OLTP)', 'Analytical (OLAP)', 'Hybrid'],
+              showWhen: { field: 'model-type', equals: 'Relational (SQL)' }
+            },
+            {
+              id: 'relational-ha',
+              label: 'Preferred HA level',
+              type: 'select',
+              options: ['Single AZ', 'Zone redundant', 'Geo-distributed'],
+              showWhen: { field: 'model-type', equals: 'Relational (SQL)' }
+            },
+            {
+              id: 'partition-key',
+              label: 'Partition key strategy',
+              type: 'text',
+              placeholder: 'e.g., tenantId',
+              showWhen: { field: 'model-type', values: ['Document (NoSQL)', 'Key-value'] }
+            },
+            {
+              id: 'document-size',
+              label: 'Typical document size',
+              type: 'numeric-with-units',
+              units: ['KB', 'MB'],
+              defaultUnit: 'KB',
+              showWhen: { field: 'model-type', values: ['Document (NoSQL)', 'Key-value'] }
+            },
+            {
+              id: 'throughput-requirement',
+              label: 'Provisioned throughput target',
+              type: 'numeric-with-units',
+              units: ['RU/s', 'ops/s'],
+              defaultUnit: 'RU/s',
+              showWhen: { field: 'model-type', values: ['Document (NoSQL)', 'Key-value'] }
+            },
+            {
+              id: 'file-size',
+              label: 'Typical file size',
+              type: 'numeric-with-units',
+              units: ['MB', 'GB', 'TB'],
+              defaultUnit: 'MB',
+              placeholder: '500',
+              showWhen: { field: 'model-type', equals: 'Blob/File storage' }
+            },
+            {
+              id: 'access-pattern',
+              label: 'Access pattern',
+              type: 'select',
+              options: ['Random access', 'Sequential ingest', 'Cold archive', 'Streaming download'],
+              showWhen: { field: 'model-type', equals: 'Blob/File storage' }
+            },
+            {
+              id: 'ingest-rate',
+              label: 'Ingest rate',
+              type: 'numeric-with-units',
+              units: ['events/s', 'MB/s'],
+              defaultUnit: 'events/s',
+              showWhen: { field: 'model-type', equals: 'Time-series' }
+            },
+            {
+              id: 'retention-window',
+              label: 'Retention window',
+              type: 'numeric-with-units',
+              units: ['days', 'weeks', 'months'],
+              defaultUnit: 'days',
+              showWhen: { field: 'model-type', equals: 'Time-series' }
+            },
+            {
+              id: 'graph-scale',
+              label: 'Approximate nodes/edges',
+              type: 'text',
+              placeholder: 'e.g., 50M nodes / 1B edges',
+              showWhen: { field: 'model-type', equals: 'Graph' }
+            },
+            {
+              id: 'graph-patterns',
+              label: 'Dominant traversal pattern',
+              type: 'select',
+              options: ['Deep traversal', 'Pattern matching', 'Recommendation/connectedness'],
+              showWhen: { field: 'model-type', equals: 'Graph' }
+            }
+          ]
+        }
+      },
+      {
+        id: 'global-defaults-heading',
+        text: 'Defaults across data models',
         inputType: 'subheading',
         isRequired: false,
         isOptional: true,
         isCompleted: true,
         architectureImpact: 'important',
-        helpText: 'Global settings may prefill new data models or restrict specific choices.'
+        helpText: 'These settings prefill new models and act as guardrails. Override them inside a model card when needed.'
       },
       {
         id: 'consistency-level',
@@ -226,7 +360,7 @@ export const nfrSections: NFRSection[] = [
         isOptional: false,
         isCompleted: false,
         architectureImpact: 'important',
-        helpText: 'Percentages should total 100%. Used for defaults and recommendations.'
+        helpText: 'Percentages should total 100%. Used as the baseline mix when sizing services unless a model overrides it.'
       },
       {
         id: 'data-storage-config',
@@ -236,7 +370,7 @@ export const nfrSections: NFRSection[] = [
         isOptional: true,
         isCompleted: false,
         architectureImpact: 'critical',
-        helpText: 'Defaults based on your general storage preferences. Models can diverge as needed.',
+        helpText: 'Set global defaults for storage type, indexing, and access. They can be tightened within each model as needed.',
         conditionalFields: [
           {
             id: 'storage-type',
@@ -262,7 +396,7 @@ export const nfrSections: NFRSection[] = [
             defaultUnit: 'KB',
             required: false,
             visible: false,
-            helpText: 'Average size per document/record'
+            helpText: 'Baseline average size per document/record'
           },
           {
             id: 'file-size',
@@ -272,7 +406,7 @@ export const nfrSections: NFRSection[] = [
             defaultUnit: 'MB',
             required: false,
             visible: false,
-            helpText: 'Average size per file'
+            helpText: 'Baseline average size per file'
           },
           {
             id: 'indexing-strategy',
@@ -305,64 +439,14 @@ export const nfrSections: NFRSection[] = [
         ]
       },
       {
-        id: 'data-models',
-        text: 'Data models',
-        inputType: 'card-list',
-        isRequired: true,
-        isOptional: false,
-        isCompleted: false,
-        architectureImpact: 'critical',
-        helpText: 'Define each distinct data source or dataset as a separate model.',
-        infoPopover: {
-          title: 'Why define data models?',
-          description: 'Capturing each logical dataset lets the platform recommend the right storage engines, optimize throughput, and estimate storage growth independently.',
-          bullets: [
-            { label: 'Workload fit', text: 'Relational, NoSQL, time-series, or blob storage each have different trade-offs for latency and consistency.' },
-            { label: 'Sizing accuracy', text: 'Knowing dataset size and expected growth drives SKU selection, partitioning, and cost forecasting.' },
-            { label: 'Compliance & sharing', text: 'Different datasets may have different residency, retention, or access rules.' }
-          ]
-        },
-        cardConfig: {
-          addButtonText: 'Add Data Model',
-          cardTitle: 'Data Source',
-          maxCards: 5,
-          fields: [
-            { id: 'name', label: 'Data Source Name', type: 'text', placeholder: 'e.g., User profiles, Order history' },
-            { id: 'model-type', label: 'Data Model', type: 'select', options: ['Relational (SQL)', 'Document (NoSQL)', 'Key-value', 'Time-series', 'Graph', 'Blob/File storage'] },
-            {
-              id: 'dataset-origin',
-              label: 'Starting dataset context',
-              type: 'select',
-              options: [
-                'Greenfield (0 existing data)',
-                'Migrating existing workload',
-                'Seeding partner/vendor data',
-                'Pre-provisioned reference data'
-              ],
-              defaultValue: 'Greenfield (0 existing data)'
-            },
-            { id: 'consistency', label: 'Consistency Requirements', type: 'select', options: ['Strong (ACID)', 'Bounded-staleness', 'Session', 'Eventual'] },
-            {
-              id: 'size-estimate',
-              label: 'Existing dataset size',
-              type: 'numeric-with-units',
-              units: ['MB', 'GB', 'TB'],
-              defaultUnit: 'GB',
-              placeholder: '250',
-              showWhen: { field: 'dataset-origin', notEquals: 'Greenfield (0 existing data)' }
-            }
-          ]
-        }
-      },
-      {
         id: 'data-growth',
-        text: 'Data growth rate and retention',
+        text: 'Data growth & retention defaults',
         inputType: 'compound',
         isRequired: false,
         isOptional: true,
         isCompleted: false,
         architectureImpact: 'important',
-        helpText: 'Amount per period and overall retention help size storage and lifecycle policies',
+        helpText: 'Provide baseline growth and retention expectations. Override inside specific data models if needed.',
         compoundFields: [
           { id: 'growth-amount', label: 'Growth Amount', type: 'text', placeholder: '100' },
           { id: 'growth-unit', label: 'Unit', type: 'select', options: ['GB', 'TB', 'PB'] },
@@ -373,16 +457,49 @@ export const nfrSections: NFRSection[] = [
       },
       {
         id: 'item-size',
-        text: 'Typical item/document size ranges?',
+        text: 'Default item/document size range?',
         inputType: 'size-range',
         isRequired: false,
         isOptional: true,
         isCompleted: false,
         architectureImpact: 'important',
-        helpText: 'Affects storage and transfer optimization strategies',
-        
+        helpText: 'Used when a data model does not supply its own size profile. Drives partitioning and transfer tuning.',
       },
-      
+      {
+        id: 'data-resilience-heading',
+        text: 'Data resilience hooks',
+        inputType: 'subheading',
+        isRequired: false,
+        isOptional: true,
+        isCompleted: true,
+        architectureImpact: 'important',
+        helpText: 'Flag durability requirements that must also be reflected in Availability & Resilience.'
+      },
+      {
+        id: 'data-resilience',
+        text: 'Which resilience guarantees are required?',
+        inputType: 'multiselect',
+        isRequired: false,
+        isOptional: true,
+        isCompleted: false,
+        architectureImpact: 'important',
+        helpText: 'Selections feed cross-checks with the Availability & Resilience section so storage, backup, and DR plans stay aligned.',
+        infoPopover: {
+          title: 'Data durability cues',
+          description: 'Tie these selections to the broader resiliency posture so the architecture never falls out of compliance.',
+          bullets: [
+            { label: 'Point-in-time restore', text: 'Continuous backups with configurable retention for rapid recovery from corruption.' },
+            { label: 'Geo-replicated replicas', text: 'Active/active or active/passive copies in a paired region for DR and low-latency reads.' },
+            { label: 'Immutable backups', text: 'Hardened snapshots or vault backups that protect against ransomware or malicious deletes.' }
+          ]
+        },
+        options: [
+          'Point-in-time restore required',
+          'Geo-replicated read replicas',
+          'Immutable or air-gapped backups',
+          'Automated failover playbook (tested)'
+        ]
+      },
       {
         id: 'transactions',
         text: 'Transactions required across entities? (ACID scope)',
