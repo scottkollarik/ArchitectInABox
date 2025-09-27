@@ -42,6 +42,14 @@ export interface CompoundField {
   suffix?: string
   units?: string[]
   defaultUnit?: string
+  defaultValue?: any
+  showWhen?: {
+    field: string
+    equals?: any
+    notEquals?: any
+    values?: any[]
+    notValues?: any[]
+  }
 }
 
 export interface CardConfig {

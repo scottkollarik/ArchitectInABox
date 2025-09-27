@@ -25,16 +25,28 @@ const InfoTooltip: React.FC<InfoTooltipProps> = ({ title, description, bullets, 
           <span className="mt-1 block text-[11px] leading-relaxed text-slate-100/90">{description}</span>
         )}
         {bullets?.length ? (
-          <ul className="mt-2 space-y-1">
-            {bullets.map((item, index) => (
-              <li key={`${item.label ?? index}`} className="flex gap-1 text-[11px] leading-relaxed text-slate-100/80">
-                {item.label ? (
-                  <span className="font-medium text-white">{item.label}:</span>
-                ) : null}
-                <span>{item.text}</span>
-              </li>
-            ))}
-          </ul>
+          <table className="mt-2 w-full border-separate border-spacing-y-1 text-[11px] leading-relaxed text-slate-100/85">
+            <tbody>
+              {bullets.map((item, index) => (
+                <tr key={`${item.label ?? index}`}>
+                  {item.label ? (
+                    <>
+                      <th scope="row" className="pr-3 text-left align-top font-semibold text-white whitespace-nowrap">
+                        {item.label}
+                      </th>
+                      <td className="text-left align-top text-slate-100/85">
+                        {item.text}
+                      </td>
+                    </>
+                  ) : (
+                    <td className="text-left align-top text-slate-100/85" colSpan={2}>
+                      {item.text}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         ) : null}
       </span>
     </button>

@@ -98,6 +98,82 @@
   .badge-service-tier {
     @apply inline-block px-2 py-1 text-xs font-medium rounded-full transition-colors;
   }
+
+  .slider-mixer {
+    @apply appearance-none w-full bg-transparent cursor-pointer focus:outline-none;
+  }
+
+  .slider-mixer::-webkit-slider-runnable-track {
+    height: 6px;
+    background-color: theme('colors.architect-gray.300');
+    border-radius: 9999px;
+    transition: background-color 0.2s ease;
+  }
+
+  .dark .slider-mixer::-webkit-slider-runnable-track {
+    background-color: theme('colors.gray.700');
+  }
+
+  .slider-mixer:hover::-webkit-slider-runnable-track {
+    background-color: theme('colors.architect-gray.400');
+  }
+
+  .slider-mixer::-webkit-slider-thumb {
+    appearance: none;
+    height: 16px;
+    width: 16px;
+    margin-top: -5px;
+    border-radius: 9999px;
+    border: 2px solid theme('colors.azure-blue.500');
+    background-color: theme('colors.white');
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .dark .slider-mixer::-webkit-slider-thumb {
+    border-color: theme('colors.azure-blue.400');
+    background-color: theme('colors.gray.900');
+  }
+
+  .slider-mixer:active::-webkit-slider-thumb {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+  }
+
+  .slider-mixer::-moz-range-track {
+    height: 6px;
+    background-color: theme('colors.architect-gray.300');
+    border-radius: 9999px;
+    transition: background-color 0.2s ease;
+  }
+
+  .dark .slider-mixer::-moz-range-track {
+    background-color: theme('colors.gray.700');
+  }
+
+  .slider-mixer:hover::-moz-range-track {
+    background-color: theme('colors.architect-gray.400');
+  }
+
+  .slider-mixer::-moz-range-thumb {
+    height: 16px;
+    width: 16px;
+    border-radius: 9999px;
+    border: 2px solid theme('colors.azure-blue.500');
+    background-color: theme('colors.white');
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .dark .slider-mixer::-moz-range-thumb {
+    border-color: theme('colors.azure-blue.400');
+    background-color: theme('colors.gray.900');
+  }
+
+  .slider-mixer:active::-moz-range-thumb {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+  }
   
   .badge-paas {
     @apply badge-service-tier bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200;

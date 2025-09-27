@@ -26,6 +26,12 @@
 - Onboarding wizard (profile completion, first project scaffold, NFR coach).
 - Inventory UX redesign (card tinting, status badges, module filters).
 - Approval workflows for org projects (owner/contributor/reader + sign-off logic).
+- Cost report driven by NFR usage (average vs peak load, scaling breakdowns, licensing callouts).
+- NFR extensions for user counts and Microsoft 365 workload selection (drive Entra/M365 licensing).
+- Microsoft 365 service add-on catalog (Logic Apps, SPFx, declarative agents, Power Platform connectors).
+- Component-level requirement consoles (“flip” cards) for key services (App Service, VNET, Synapse) with override-aware tuning and template preview.
+- Scoped NFR overrides attached to components/workstreams while inheriting from global baselines.
+- Wireframe “rack back” interaction for visualizing service wiring (dependencies, networking, logging).
 
 ## Bugs / Known Issues
 - Avatar picker does not persist selection (localStorage update confirmed, but badge not refreshing).

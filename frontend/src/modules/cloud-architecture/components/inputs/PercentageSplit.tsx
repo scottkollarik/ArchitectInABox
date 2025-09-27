@@ -54,27 +54,27 @@ const PercentageSplit: React.FC<PercentageSplitProps> = ({ id, value, onChange, 
     const sliderWrite = typeof internal.write === 'number' ? internal.write : (typeof value?.write === 'number' ? (value!.write as number) : 50)
     const sliderRead = 100 - sliderWrite
     return (
-      <div className={`space-y-1 ${className}`}>
+      <div className={`space-y-2 ${className}`}>
         <div className="w-1/3 min-w-[220px] max-w-[360px]">
-        <div className="flex items-center justify-between text-xs text-gray-700 dark:text-gray-300">
+          <div className="flex items-center justify-between text-xs text-gray-700 dark:text-gray-300 mb-1">
             <span>{labels?.read || 'Reads'} {sliderRead}%</span>
             <span>{labels?.write || 'Writes'} {sliderWrite}%</span>
           </div>
-        <input
-          id={`${id}-slider`}
-          type="range"
-          min={0}
-          max={100}
-          step={5}
-          value={sliderWrite}
-          onChange={(e) => {
-            const n = parseInt(e.target.value, 10)
-            const next = { read: 100 - n, write: n }
-            setInternal(next)
-            onChange(next)
-          }}
-          className="w-full accent-azure-blue-600"
-        />
+          <input
+            id={`${id}-slider`}
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={sliderWrite}
+            onChange={(e) => {
+              const n = parseInt(e.target.value, 10)
+              const next = { read: 100 - n, write: n }
+              setInternal(next)
+              onChange(next)
+            }}
+            className="slider-mixer"
+          />
         </div>
       </div>
     )

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import ToggleSwitch from '../../../../components/ToggleSwitch'
 import NumericWithUnits from './NumericWithUnits'
 
 export interface ConditionalRule {
@@ -188,21 +189,33 @@ const ConditionalFieldSet: React.FC<ConditionalFieldSetProps> = ({
             </label>
             <div className="space-y-2">
               {(fieldState?.options || field.options)?.map((option) => (
-                <label key={option} className="flex items-center">
-                  <input
-                    type="checkbox"
+                <div key={option} className="flex items-center gap-2">
+                  <ToggleSwitch
+                    size="sm"
                     checked={currentValues.includes(option)}
-                    onChange={(e) => {
-                      const newValues = e.target.checked
-                        ? [...currentValues, option]
-                        : currentValues.filter(v => v !== option)
+                    onChange={() => {
+                      const exists = currentValues.includes(option)
+                      const newValues = exists
+                        ? currentValues.filter(v => v !== option)
+                        : [...currentValues, option]
                       handleFieldChange(field.id, newValues)
                     }}
-                    className="h-4 w-4 text-azure-blue-600 focus:ring-azure-blue-500 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded"
                     disabled={fieldState?.disabled}
+                    ariaLabel={`Toggle ${option}`}
                   />
-                  <span className="ml-2 text-sm text-gray-700 dark:text-gray-200">{option}</span>
-                </label>
+                  <span
+                    className="text-sm text-gray-700 dark:text-gray-200 cursor-pointer select-none"
+                    onClick={() => {
+                      const exists = currentValues.includes(option)
+                      const newValues = exists
+                        ? currentValues.filter(v => v !== option)
+                        : [...currentValues, option]
+                      handleFieldChange(field.id, newValues)
+                    }}
+                  >
+                    {option}
+                  </span>
+                </div>
               ))}
             </div>
             {field.helpText && (
@@ -212,9 +225,11 @@ const ConditionalFieldSet: React.FC<ConditionalFieldSetProps> = ({
         )
 
       case 'numeric-with-units':
-        const isDocSize = inlineWrap && field.id === 'document-size'
+        const isDocSize = field.id === 'document-size'
+        const isFileSize = field.id === 'file-size'
+        const compactNumeric = isDocSize || isFileSize
         return (
-          <div key={field.id} className={`space-y-1 ${isDocSize ? 'basis-full' : wrapClass}`}>
+          <div key={field.id} className={`${inlineWrap && !compactNumeric ? wrapClass : ''}`}>
             <NumericWithUnits
               id={fieldId}
               value={fieldValue}
@@ -227,10 +242,12 @@ const ConditionalFieldSet: React.FC<ConditionalFieldSetProps> = ({
               min={field.min}
               max={field.max}
               allowDecimals={field.allowDecimals}
-              className={inlineWrap ? (isDocSize ? 'w-full' : 'w-44') : ''}
+              className={inlineWrap && !compactNumeric ? 'w-44' : ''}
+              inputWidthClass={compactNumeric ? 'min-w-[10rem]' : undefined}
+              unitWidthClass={compactNumeric ? 'w-16' : undefined}
             />
-            {field.helpText && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">{field.helpText}</p>
+            {field.helpText && !compactNumeric && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{field.helpText}</p>
             )}
           </div>
         )

@@ -14,6 +14,8 @@ export interface NumericWithUnitsProps {
   placeholder?: string
   label?: string
   className?: string
+  inputWidthClass?: string
+  unitWidthClass?: string
   disabled?: boolean
   min?: number
   max?: number
@@ -30,6 +32,8 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
   placeholder = "0",
   label,
   className = "",
+  inputWidthClass,
+  unitWidthClass,
   disabled = false,
   min,
   max,
@@ -104,7 +108,7 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
 
   return (
     <div className={`flex items-end gap-2 ${className}`}>
-      <div className="flex-1 min-w-[6rem]">
+      <div className={inputWidthClass || 'flex-1 min-w-[6rem]'}>
         {label && (
           <label htmlFor={id} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
             {label}
@@ -134,7 +138,7 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
             <select
               value={internalValue.unit}
               onChange={(e) => handleUnitChange(e.target.value)}
-              className="block w-20 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className={`block px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm ${unitWidthClass || 'w-20'}`}
               disabled={disabled}
             >
               {units.map((unit) => (
@@ -147,7 +151,7 @@ const NumericWithUnits: React.FC<NumericWithUnitsProps> = ({
         ) : (
           <div>
             {label && <div className="block text-xs font-medium text-transparent mb-1">Unit</div>}
-            <span className="inline-block px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 w-12 text-center">
+            <span className={`inline-block px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-center ${unitWidthClass || 'w-12'}`}>
               {internalValue.unit}
             </span>
           </div>

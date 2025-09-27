@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import ToggleSwitch from '../../../../components/ToggleSwitch'
 
 export interface MultiSelectWithNotesValue {
   selections: string[]
@@ -80,15 +81,15 @@ const MultiSelectWithNotes: React.FC<MultiSelectWithNotesProps> = ({
     <div className={`space-y-3 ${className}`}>
       <div className="space-y-2">
         {optionTokens.map(({ label }) => (
-          <label key={label} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 text-azure-blue-600 border-gray-300 rounded focus:ring-azure-blue-500"
+          <div key={label} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+            <ToggleSwitch
+              size="sm"
               checked={internal.selections.includes(label)}
               onChange={() => toggleSelection(label)}
+              ariaLabel={`Toggle ${label}`}
             />
-            <span>{label}</span>
-          </label>
+            <span className="cursor-pointer select-none" onClick={() => toggleSelection(label)}>{label}</span>
+          </div>
         ))}
         {options.length === 0 && (
         <div className="text-xs text-gray-500 dark:text-gray-400">No options configured.</div>

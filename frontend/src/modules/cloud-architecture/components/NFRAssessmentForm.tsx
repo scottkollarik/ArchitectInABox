@@ -21,6 +21,7 @@ import InfoTooltip from './inputs/InfoTooltip'
 import ExpectedRpsInput from './inputs/ExpectedRpsInput'
 import MultiSelectWithNotes from './inputs/MultiSelectWithNotes'
 import { nfrRecipes } from '../data/recipes'
+import ToggleSwitch from '../../../components/ToggleSwitch'
 
 // Local helper: numeric-with-units parse for legacy strings
 const parseNumericWithUnit = (raw: any, defaultUnit: string) => {
@@ -382,19 +383,129 @@ const NFRAssessmentForm: React.FC = () => {
     maxCards: number
     defaults?: Record<string, any>
   }> = ({ sectionId, questionId, inputId, cards, fields, addButtonText, cardTitle, maxCards, defaults = {} }) => {
+    const getNumericDefault = React.useCallback((field: any) => ({
+      value: '',
+      unit: field.defaultUnit || (field.units?.[0] || 'GB')
+    }), [])
+
+    const getFieldDefault = React.useCallback((field: any) => {
+      if (field.type === 'numeric-with-units') return getNumericDefault(field)
+      if (defaults[field.id] !== undefined) return defaults[field.id]
+      if (field.defaultValue !== undefined) return field.defaultValue
+      return ''
+    }, [defaults, getNumericDefault])
+
     const [draft, setDraft] = React.useState<Record<string, any>>(() => {
       const init: Record<string, any> = {}
       fields.forEach((f: any) => {
-        if (f.type === 'numeric-with-units') init[f.id] = { value: '', unit: f.defaultUnit || (f.units?.[0] || 'GB') }
-        else init[f.id] = (f.id === 'consistency' && defaults.consistency) ? defaults.consistency : ''
+        init[f.id] = getFieldDefault(f)
       })
       return init
     })
+    const [expandedCards, setExpandedCards] = React.useState<Record<number, boolean>>({})
 
-    const setDraftField = (id: string, val: any) => setDraft(prev => ({ ...prev, [id]: val }))
+    const datasetOriginDefault = React.useMemo(
+      () => fields.find((f: any) => f.id === 'dataset-origin')?.defaultValue,
+      [fields]
+    )
+
+    const sizeFieldConfig = React.useMemo(
+      () => fields.find((f: any) => f.id === 'size-estimate'),
+      [fields]
+    )
+
+    const resolveConditionalValue = React.useCallback((fieldId: string, values: Record<string, any>) => {
+      if (!values) return undefined
+      const direct = values[fieldId]
+      if (direct !== undefined && direct !== '') return direct
+      const controlling = fields.find((f: any) => f.id === fieldId)
+      if (!controlling) return direct
+      if (controlling.type === 'numeric-with-units') return direct
+      if (controlling.defaultValue !== undefined) return controlling.defaultValue
+      return direct
+    }, [fields])
+
+    const shouldRenderField = React.useCallback((field: any, values: Record<string, any>) => {
+      if (!field.showWhen) return true
+      const compareValue = resolveConditionalValue(field.showWhen.field, values)
+      if (field.showWhen.equals !== undefined) return compareValue === field.showWhen.equals
+      if (field.showWhen.notEquals !== undefined) return compareValue !== field.showWhen.notEquals
+      if (field.showWhen.values) return field.showWhen.values.includes(compareValue)
+      if (field.showWhen.notValues) return !field.showWhen.notValues.includes(compareValue)
+      return true
+    }, [resolveConditionalValue])
+
+    const handleSelectChange = React.useCallback((field: any, cardIdx: number, value: string) => {
+      updateCardField(sectionId, questionId, cardIdx, field.id, value)
+      if (field.id === 'dataset-origin' && datasetOriginDefault && value === datasetOriginDefault && sizeFieldConfig) {
+        updateCardField(sectionId, questionId, cardIdx, 'size-estimate', getNumericDefault(sizeFieldConfig))
+      }
+    }, [datasetOriginDefault, getNumericDefault, questionId, sectionId, sizeFieldConfig, updateCardField])
+
+    React.useEffect(() => {
+      setExpandedCards(prev => {
+        const next: Record<number, boolean> = {}
+        cards.forEach((_, index) => {
+          next[index] = prev[index] ?? false
+        })
+        return next
+      })
+    }, [cards])
+
+    React.useEffect(() => {
+      const datasetOriginField = fields.find((f: any) => f.id === 'dataset-origin')
+      const sizeField = sizeFieldConfig
+
+      cards.forEach((card, index) => {
+        if (!card) return
+        const currentOrigin = card['dataset-origin']
+        const sizeVal = card['size-estimate']
+        const hasSizeValue = (() => {
+          if (!sizeVal) return false
+          if (typeof sizeVal === 'object') {
+            const value = sizeVal.value
+            if (value === undefined || value === null) return false
+            if (typeof value === 'string') return value.trim() !== ''
+            return value !== ''
+          }
+          if (typeof sizeVal === 'string') return sizeVal.trim() !== ''
+          return true
+        })()
+
+        if (!currentOrigin && datasetOriginField) {
+          const inferredOrigin = hasSizeValue ? 'Migrating existing workload' : datasetOriginField.defaultValue
+          if (inferredOrigin) {
+            updateCardField(sectionId, questionId, index, 'dataset-origin', inferredOrigin)
+            return
+          }
+        }
+
+        const effectiveOrigin = currentOrigin || (hasSizeValue ? 'Migrating existing workload' : datasetOriginField?.defaultValue)
+        if (effectiveOrigin === datasetOriginField?.defaultValue && hasSizeValue && sizeField) {
+          updateCardField(sectionId, questionId, index, 'size-estimate', getNumericDefault(sizeField))
+        }
+      })
+    }, [cards, fields, getNumericDefault, questionId, sectionId, sizeFieldConfig, updateCardField])
+
+    const setDraftField = (id: string, val: any) => {
+      if (id === 'dataset-origin' && datasetOriginDefault && val === datasetOriginDefault) {
+        const sizeDefault = sizeFieldConfig ? getNumericDefault(sizeFieldConfig) : undefined
+        setDraft(prev => ({
+          ...prev,
+          [id]: val,
+          ...(sizeDefault ? { 'size-estimate': sizeDefault } : {})
+        }))
+        return
+      }
+      setDraft(prev => ({ ...prev, [id]: val }))
+    }
 
     const handleAdd = () => {
-      const newCard = { ...draft }
+      const newCard: Record<string, any> = {}
+      fields.forEach((f: any) => {
+        const val = draft[f.id]
+        newCard[f.id] = f.type === 'numeric-with-units' && val ? { ...val } : val
+      })
       setSections(prev => prev.map(section =>
         section.id === sectionId
           ? {
@@ -410,40 +521,104 @@ const NFRAssessmentForm: React.FC = () => {
       // reset draft
       const reset: Record<string, any> = {}
       fields.forEach((f: any) => {
-        if (f.type === 'numeric-with-units') reset[f.id] = { value: '', unit: f.defaultUnit || (f.units?.[0] || 'GB') }
-        else reset[f.id] = ''
+        reset[f.id] = getFieldDefault(f)
       })
       setDraft(reset)
+    }
+
+    const formatSizeEstimate = (val: any, origin?: string) => {
+      const defaultGreenfield = datasetOriginDefault || 'Greenfield (0 existing data)'
+      if (origin && origin === defaultGreenfield) return 'No existing data'
+      if (!val) return 'Size unknown'
+      if (typeof val === 'object') {
+        const rawValue = val.value
+        const hasValue =
+          rawValue !== undefined &&
+          rawValue !== null &&
+          !(typeof rawValue === 'string' && rawValue.trim() === '')
+        if (!hasValue) return 'Size unknown'
+        const unit = val.unit || ''
+        return `${rawValue} ${unit}`.trim()
+      }
+      return String(val)
+    }
+
+    const toggleCard = (index: number) => {
+      setExpandedCards(prev => ({ ...prev, [index]: !(prev[index] ?? false) }))
     }
 
     return (
       <div className="mt-1 space-y-4">
         {/* Existing Cards */}
-        {cards.map((card, cardIndex) => (
-          <div key={cardIndex} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700">
-              <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200">{cardTitle || 'Item'} {cardIndex + 1}</h4>
-              <button type="button" onClick={() => removeCard(sectionId, questionId, cardIndex)} className="text-red-600 hover:text-red-800 text-sm flex items-center space-x-1">
-                <TrashIcon className="h-4 w-4" />
-                <span>Remove</span>
-              </button>
-            </div>
+        {cards.map((card, cardIndex) => {
+          const datasetOrigin = card?.['dataset-origin'] ?? datasetOriginDefault
+          return (
+            <div
+              key={cardIndex}
+              className="relative border border-indigo-100 dark:border-indigo-700/60 rounded-xl bg-indigo-50/80 dark:bg-indigo-900/40 shadow-sm overflow-hidden transition-colors"
+            >
+            <button
+              type="button"
+              onClick={() => toggleCard(cardIndex)}
+              className="relative flex w-full items-stretch pl-10 pr-4 py-3"
+              aria-expanded={expandedCards[cardIndex] ?? false}
+            >
+              <span className="absolute left-0 top-0 bottom-0 flex items-center justify-center w-8 bg-indigo-500 text-white text-xs font-semibold uppercase tracking-wide">
+                {cardIndex + 1}
+              </span>
+              <div className="flex flex-1 items-center justify-between gap-3 text-left">
+                <div className="flex flex-col">
+                  <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {card.name || `${cardTitle || 'Item'} ${cardIndex + 1}`}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-architect-gray-600 dark:text-gray-300">
+                    <span>Model: {card['model-type'] || 'Not set'}</span>
+                    <span>Context: {datasetOrigin || 'Not set'}</span>
+                    <span>Consistency: {card.consistency || '—'}</span>
+                    <span>Existing data: {formatSizeEstimate(card['size-estimate'], datasetOrigin)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setExpandedCards(prev => {
+                        const next = { ...prev }
+                        delete next[cardIndex]
+                        return next
+                      })
+                      removeCard(sectionId, questionId, cardIndex)
+                    }}
+                    className="text-red-500 hover:text-red-600 text-xs font-medium flex items-center gap-1"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                    Remove
+                  </button>
+                  <ChevronDownIcon className={`h-4 w-4 text-architect-gray-500 dark:text-gray-400 transition-transform ${expandedCards[cardIndex] ? 'rotate-180' : ''}`} />
+                </div>
+              </div>
+            </button>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {fields.map((field: any) => {
-                const fieldValue = card[field.id] || ''
-                const cardFieldInputId = `${inputId}-card-${cardIndex}-${field.id}`
-                const path = (field.id === 'consistency') ? `data.models.${cardIndex}.consistency` : ''
-                const lock = path ? matchLock(path) : undefined
-                const options = (field.options || []).filter((o: string) => !lock || lock.mode !== 'policy-only' || !lock.allowedValues?.length || lock.allowedValues.includes(o))
-                return (
-                  <div key={field.id}>
-                    <label htmlFor={cardFieldInputId} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{field.label}</label>
-                    {field.type === 'select' ? (
+            {(expandedCards[cardIndex] ?? false) && (
+              <div className="border-t border-indigo-100 dark:border-indigo-700/60 px-4 py-4 bg-white/90 dark:bg-gray-900/70">
+                <div className="grid grid-cols-1 gap-3">
+                  {fields.map((field: any) => {
+                    if (!shouldRenderField(field, card)) return null
+                    const rawFieldValue = card[field.id]
+                    const fieldValue = rawFieldValue !== undefined ? rawFieldValue : getFieldDefault(field)
+                    const cardFieldInputId = `${inputId}-card-${cardIndex}-${field.id}`
+                    const path = (field.id === 'consistency') ? `data.models.${cardIndex}.consistency` : ''
+                    const lock = path ? matchLock(path) : undefined
+                    const options = (field.options || []).filter((o: string) => !lock || lock.mode !== 'policy-only' || !lock.allowedValues?.length || lock.allowedValues.includes(o))
+                    return (
+                      <div key={field.id}>
+                        <label htmlFor={cardFieldInputId} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{field.label}</label>
+                        {field.type === 'select' ? (
                       <select
                         id={cardFieldInputId}
-                        value={fieldValue}
-                        onChange={(e) => updateCardField(sectionId, questionId, cardIndex, field.id, e.target.value)}
+                        value={(fieldValue ?? '') as string}
+                        onChange={(e) => handleSelectChange(field, cardIndex, e.target.value)}
                         className="inline-block max-w-xs px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                         disabled={!!lock && lock.mode === 'locked'}
                       >
@@ -459,12 +634,14 @@ const NFRAssessmentForm: React.FC = () => {
                         onChange={(val) => updateCardField(sectionId, questionId, cardIndex, field.id, val)}
                         units={field.units || ['units']}
                         defaultUnit={field.defaultUnit}
+                        inputWidthClass={field.id === 'size-estimate' ? 'w-28' : undefined}
+                        unitWidthClass={field.id === 'size-estimate' ? 'w-16' : undefined}
                       />
                     ) : (
                       <input
                         id={cardFieldInputId}
                         type={field.type}
-                        value={fieldValue}
+                        value={(fieldValue ?? '') as string}
                         onChange={(e) => updateCardField(sectionId, questionId, cardIndex, field.id, e.target.value)}
                         className="block max-w-xs px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                         placeholder={field.placeholder}
@@ -473,18 +650,23 @@ const NFRAssessmentForm: React.FC = () => {
                   </div>
                 )
               })}
+                </div>
+              </div>
+            )}
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         {/* Composer for new card */}
         {cards.length < maxCards ? (
-          <div className="border border-dashed border-gray-300 rounded-lg p-4">
+          <div className="border border-dashed border-indigo-200 dark:border-indigo-700/50 rounded-xl p-4 bg-indigo-50/40 dark:bg-indigo-900/20 transition-colors">
             <div className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{cardTitle || 'Item'} (new)</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {fields.map((field: any) => {
+                if (!shouldRenderField(field, draft)) return null
                 const fieldId = `${inputId}-composer-${field.id}`
-                const val = draft[field.id]
+                const currentVal = draft[field.id]
+                const val = currentVal !== undefined ? currentVal : getFieldDefault(field)
                 const path = (field.id === 'consistency') ? `data.models.new.consistency` : ''
                 const lock = path ? matchLock(path) : undefined
                 const options = (field.options || []).filter((o: string) => !lock || lock.mode !== 'policy-only' || !lock.allowedValues?.length || lock.allowedValues.includes(o))
@@ -494,7 +676,7 @@ const NFRAssessmentForm: React.FC = () => {
                     {field.type === 'select' ? (
                       <select
                         id={fieldId}
-                        value={val || ''}
+                        value={(val ?? '') as string}
                         onChange={(e) => setDraftField(field.id, e.target.value)}
                         className="inline-block max-w-xs px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                         disabled={!!lock && lock.mode === 'locked'}
@@ -507,16 +689,18 @@ const NFRAssessmentForm: React.FC = () => {
                     ) : field.type === 'numeric-with-units' ? (
                       <NumericWithUnits
                         id={fieldId}
-                        value={val || { value: '', unit: field.defaultUnit || (field.units?.[0] || 'GB') }}
+                        value={typeof val === 'object' ? val : getFieldDefault(field)}
                         onChange={(v) => setDraftField(field.id, v)}
                         units={field.units || ['units']}
                         defaultUnit={field.defaultUnit}
+                        inputWidthClass={field.id === 'size-estimate' ? 'w-28' : undefined}
+                        unitWidthClass={field.id === 'size-estimate' ? 'w-16' : undefined}
                       />
                     ) : (
                       <input
                         id={fieldId}
                         type={field.type}
-                        value={val || ''}
+                        value={(val ?? '') as string}
                         onChange={(e) => setDraftField(field.id, e.target.value)}
                         className="block max-w-xs px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                         placeholder={field.placeholder}
@@ -653,23 +837,27 @@ const NFRAssessmentForm: React.FC = () => {
       case 'multiselect':
         return (
           <div className="mt-1 space-y-2">
-            {question.options?.map((option) => (
-              <label key={option} className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={Array.isArray(question.value) && question.value.includes(option)}
-                  onChange={(e) => {
-                    const currentValues = Array.isArray(question.value) ? question.value : []
-                    const newValues = e.target.checked
-                      ? [...currentValues, option]
-                      : currentValues.filter(v => v !== option)
-                    updateQuestion(sectionId, question.id, newValues)
-                  }}
-                  className="h-4 w-4 text-azure-blue-600 focus:ring-azure-blue-500 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded"
-                />
-                <span className="ml-2 text-sm text-gray-700 dark:text-gray-200">{option}</span>
-              </label>
-            ))}
+            {question.options?.map((option) => {
+              const currentValues = Array.isArray(question.value) ? question.value : []
+              const isSelected = currentValues.includes(option)
+              const toggle = () => {
+                const newValues = isSelected
+                  ? currentValues.filter(v => v !== option)
+                  : [...currentValues, option]
+                updateQuestion(sectionId, question.id, newValues)
+              }
+              return (
+                <div key={option} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                  <ToggleSwitch
+                    size="sm"
+                    checked={isSelected}
+                    onChange={toggle}
+                    ariaLabel={`Toggle ${option}`}
+                  />
+                  <span className="cursor-pointer select-none" onClick={toggle}>{option}</span>
+                </div>
+              )
+            })}
           </div>
         )
 
@@ -758,12 +946,17 @@ const NFRAssessmentForm: React.FC = () => {
         // Default compound layout
         return (
           <div className="mt-1">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-wrap gap-3">
               {question.compoundFields?.map((field) => {
                 const fieldValue = question.value?.[field.id] || ''
                 const fieldInputId = `${inputId}-${field.id}`
+                const slimFields = ['min-instances', 'max-instances', 'scale-threshold']
+                const mediumFields = ['scale-signal']
+                const slim = slimFields.includes(field.id)
+                const medium = mediumFields.includes(field.id)
+                const widthClass = slim ? 'max-w-[9rem]' : medium ? 'max-w-[12rem]' : ''
                 return (
-                  <div key={field.id}>
+                  <div key={field.id} className={`${widthClass} flex-1 min-w-[9rem] max-w-xs`}>
                     <label htmlFor={fieldInputId} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {field.label}
                       {field.suffix && <span className="text-gray-500 dark:text-gray-400 ml-1">({field.suffix})</span>}
@@ -773,7 +966,7 @@ const NFRAssessmentForm: React.FC = () => {
                         id={fieldInputId}
                         value={fieldValue}
                         onChange={(e) => updateCompoundField(sectionId, question.id, field.id, e.target.value)}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+                        className={`block w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${slim ? 'pr-6' : ''}`}
                       >
                         <option value="">Select...</option>
                         {field.options?.map((option) => (
@@ -786,7 +979,7 @@ const NFRAssessmentForm: React.FC = () => {
                         type={field.type}
                         value={fieldValue}
                         onChange={(e) => updateCompoundField(sectionId, question.id, field.id, e.target.value)}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 sm:text-sm"
+                        className="block w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm"
                         placeholder={field.placeholder}
                       />
                     )}
@@ -972,12 +1165,19 @@ const NFRAssessmentForm: React.FC = () => {
                   <div key={question.id} className="space-y-2">
                     {(() => {
                       const forId = getQuestionLabelTargetId(section.id, question)
+                      const modelCount = question.id === 'data-models' && Array.isArray(question.value) ? question.value.length : 0
+                      const countBadge = question.id === 'data-models' ? (
+                        <span className="inline-flex items-center justify-center rounded-full border border-architect-gray-200 dark:border-gray-600 bg-architect-gray-100/70 dark:bg-gray-800 px-1.5 py-0.5 text-[10px] text-architect-gray-700 dark:text-gray-200">
+                          {modelCount}
+                        </span>
+                      ) : null
                       const title = (
                         <span className="inline-flex items-center gap-2">
                           <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
                             {question.text}
                             {question.isRequired && <span className="text-red-500 ml-1">*</span>}
                           </span>
+                          {countBadge}
                           {question.infoPopover ? (
                             <InfoTooltip
                               title={question.infoPopover.title}

@@ -82,7 +82,7 @@ export const nfrSections: NFRSection[] = [
           },
           {
             id: 'max-instances',
-            label: 'Burst max',
+            label: 'Max instances (Burst)',
             type: 'text',
             placeholder: 'e.g., 10'
           },
@@ -305,24 +305,23 @@ export const nfrSections: NFRSection[] = [
         ]
       },
       {
-        id: 'models-subheading',
-        text: 'Data Models',
-        inputType: 'subheading',
-        isRequired: false,
-        isOptional: true,
-        isCompleted: true,
-        architectureImpact: 'important',
-        helpText: 'Define each distinct data source or dataset as a separate model.'
-      },
-      {
         id: 'data-models',
-        text: 'Data models (add multiple if you have different data sources)',
+        text: 'Data models',
         inputType: 'card-list',
         isRequired: true,
         isOptional: false,
         isCompleted: false,
         architectureImpact: 'critical',
-        helpText: 'Each data model may require different database technologies',
+        helpText: 'Define each distinct data source or dataset as a separate model.',
+        infoPopover: {
+          title: 'Why define data models?',
+          description: 'Capturing each logical dataset lets the platform recommend the right storage engines, optimize throughput, and estimate storage growth independently.',
+          bullets: [
+            { label: 'Workload fit', text: 'Relational, NoSQL, time-series, or blob storage each have different trade-offs for latency and consistency.' },
+            { label: 'Sizing accuracy', text: 'Knowing dataset size and expected growth drives SKU selection, partitioning, and cost forecasting.' },
+            { label: 'Compliance & sharing', text: 'Different datasets may have different residency, retention, or access rules.' }
+          ]
+        },
         cardConfig: {
           addButtonText: 'Add Data Model',
           cardTitle: 'Data Source',
@@ -330,8 +329,28 @@ export const nfrSections: NFRSection[] = [
           fields: [
             { id: 'name', label: 'Data Source Name', type: 'text', placeholder: 'e.g., User profiles, Order history' },
             { id: 'model-type', label: 'Data Model', type: 'select', options: ['Relational (SQL)', 'Document (NoSQL)', 'Key-value', 'Time-series', 'Graph', 'Blob/File storage'] },
+            {
+              id: 'dataset-origin',
+              label: 'Starting dataset context',
+              type: 'select',
+              options: [
+                'Greenfield (0 existing data)',
+                'Migrating existing workload',
+                'Seeding partner/vendor data',
+                'Pre-provisioned reference data'
+              ],
+              defaultValue: 'Greenfield (0 existing data)'
+            },
             { id: 'consistency', label: 'Consistency Requirements', type: 'select', options: ['Strong (ACID)', 'Bounded-staleness', 'Session', 'Eventual'] },
-            { id: 'size-estimate', label: 'Current Dataset Size', type: 'numeric-with-units', units: ['GB', 'TB'], defaultUnit: 'GB', placeholder: '100' }
+            {
+              id: 'size-estimate',
+              label: 'Existing dataset size',
+              type: 'numeric-with-units',
+              units: ['MB', 'GB', 'TB'],
+              defaultUnit: 'GB',
+              placeholder: '250',
+              showWhen: { field: 'dataset-origin', notEquals: 'Greenfield (0 existing data)' }
+            }
           ]
         }
       },

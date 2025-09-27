@@ -3,9 +3,10 @@ import { useProject } from '../context/ProjectContext'
 import AzureRegionSelector from '../modules/cloud-architecture/components/inputs/AzureRegionSelector'
 import BlueprintImportButton from '../modules/cloud-architecture/components/BlueprintImportButton'
 import { nfrRecipes } from '../modules/cloud-architecture/data/recipes'
-import CopyableNotice from './CopyableNotice'
 import { useAuth } from '../auth/EntraAuthProvider'
 import { buildAuthHeaders, getApiBase } from '../utils/apiClient'
+import CopyableNotice from './CopyableNotice'
+import ToggleSwitch from './ToggleSwitch'
 
 const defaultProfileState = {
   level: 'starter' as const,
@@ -422,30 +423,36 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
             </div>
             <div className="mt-4 space-y-3">
               <div className="flex items-start gap-3 p-3 border border-architect-gray-200 dark:border-gray-800 rounded bg-architect-gray-50 dark:bg-gray-900/60">
-                <input
+                <ToggleSwitch
                   id="waf-baseline-toggle"
-                  type="checkbox"
                   checked={!!profile.useWafBaseline}
-                  onChange={(e) => setProfile({ ...profile, useWafBaseline: e.target.checked })}
-                  className="mt-1 h-4 w-4 text-sky-600 focus:ring-sky-500 border-architect-gray-300 dark:border-gray-700 rounded"
+                  onChange={(checked) => setProfile({ ...profile, useWafBaseline: checked })}
+                  ariaLabelledBy="waf-baseline-toggle-label"
                 />
-                <label htmlFor="waf-baseline-toggle" className="text-xs text-architect-gray-700 dark:text-gray-300">
+                <div
+                  id="waf-baseline-toggle-label"
+                  className="text-xs text-architect-gray-700 dark:text-gray-300 cursor-pointer select-none"
+                  onClick={() => setProfile({ ...profile, useWafBaseline: !profile.useWafBaseline })}
+                >
                   <span className="font-semibold block text-sm text-architect-gray-900 dark:text-gray-100">Use WAF baseline</span>
                   Automatically seed identity, networking, secrets, and observability services recommended by the Azure Well-Architected Framework.
-                </label>
+                </div>
               </div>
               <div className="flex items-start gap-3 p-3 border border-architect-gray-200 dark:border-gray-800 rounded bg-architect-gray-50 dark:bg-gray-900/60">
-                <input
+                <ToggleSwitch
                   id="waf-dynamic-toggle"
-                  type="checkbox"
                   checked={!!profile.wafAdaptiveAdditions}
-                  onChange={(e) => setProfile({ ...profile, wafAdaptiveAdditions: e.target.checked })}
-                  className="mt-1 h-4 w-4 text-sky-600 focus:ring-sky-500 border-architect-gray-300 dark:border-gray-700 rounded"
+                  onChange={(checked) => setProfile({ ...profile, wafAdaptiveAdditions: checked })}
+                  ariaLabelledBy="waf-dynamic-toggle-label"
                 />
-                <label htmlFor="waf-dynamic-toggle" className="text-xs text-architect-gray-700 dark:text-gray-300">
+                <div
+                  id="waf-dynamic-toggle-label"
+                  className="text-xs text-architect-gray-700 dark:text-gray-300 cursor-pointer select-none"
+                  onClick={() => setProfile({ ...profile, wafAdaptiveAdditions: !profile.wafAdaptiveAdditions })}
+                >
                   <span className="font-semibold block text-sm text-architect-gray-900 dark:text-gray-100">Adaptive WAF recommendations</span>
                   Keeps the architecture in sync with captured NFRs by auto-adding or removing recommended services (e.g., private endpoints, monitoring toolchain).
-                </label>
+                </div>
               </div>
             </div>
             {/* Recipes */}
