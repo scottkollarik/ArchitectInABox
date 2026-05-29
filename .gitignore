@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+**/node_modules/
 /.pnp
 .pnp.js
 .yarn/cache
@@ -10,6 +11,8 @@ node_modules/
 # Production builds
 /dist
 /build
+dist/
+**/dist/
 *.tsbuildinfo
 
 # Environment variables
@@ -172,3 +175,17 @@ temp/
 # Docker
 .dockerignore
 .fake
+
+# .NET build output
+**/obj/
+**/bin/
+
+# Deployment state
+.deployment-status
+.deployment-status.tmp
+
+# Local notes / POC status
+.poc-implementation-status.md
+
+# IDE / tool state
+.continue/
