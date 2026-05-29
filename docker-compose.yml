@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   frontend:
     build:
@@ -25,7 +23,9 @@ services:
       - "5001:5000"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__MongoDB=mongodb://admin:password123@mongodb:27017/technical-architect-db?authSource=admin
+      - Database__Backend=mongodb
+      - Database__Name=tapdb
+      - ConnectionStrings__MongoDB=mongodb://admin:password123@mongodb:27017/tapdb?authSource=admin
       - ConnectionStrings__AzureBlob=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
       - ASPNETCORE_URLS=http://0.0.0.0:5000
     depends_on:

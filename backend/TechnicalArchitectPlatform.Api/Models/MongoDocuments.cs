@@ -3,6 +3,8 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace TechnicalArchitectPlatform.Api.Models;
 
+// Internal persistence models - not exposed via API
+
 public class ProjectDocument
 {
     [BsonId]
@@ -16,6 +18,7 @@ public class ProjectDocument
     public BsonDocument? Cloud { get; set; }
     public BsonDocument? BlueprintAssociation { get; set; }
     public BsonDocument? Constraints { get; set; }
+    public BsonDocument? Architecture { get; set; }
     [BsonElement("collaborators")]
     public List<ProjectCollaboratorDocument> Collaborators { get; set; } = new();
     public int SchemaVersion { get; set; } = 1;
@@ -41,4 +44,16 @@ public class NfrAssessmentDocument
     public int SchemaVersion { get; set; } = 1;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime LastModified { get; set; } = DateTime.UtcNow;
+}
+
+public class UserDocument
+{
+    [BsonId]
+    public string Id { get; set; } = default!;
+    public string Email { get; set; } = string.Empty;
+    public string? Name { get; set; }
+    public bool IsAuthenticated { get; set; }
+    public bool HasCompletedOnboarding { get; set; } = false;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime LastSeenAt { get; set; } = DateTime.UtcNow;
 }

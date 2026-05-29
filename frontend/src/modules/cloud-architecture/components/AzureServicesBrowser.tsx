@@ -87,7 +87,7 @@ const AzureServicesBrowser: React.FC = () => {
           <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-architect-gray-400" />
           <input
             type="text"
-            placeholder="Search Azure services..."
+            placeholder="Search Azure service catalog..."
             className="input-field pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}

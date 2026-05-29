@@ -1,5 +1,6 @@
 import { AzureService, AzureServiceCatalog, ProjectProfile, ProjectCloudConfig, NFRSection } from '../types'
 import { WAF_BASELINE_SERVICES, WAF_DYNAMIC_RULES, extractNfrAnswers } from './wafGuidance'
+import type { WafRuleContext } from './wafGuidance'
 
 // Azure Services based on the user's playbook
 export const azureServiceCatalog: AzureServiceCatalog = {
@@ -116,7 +117,7 @@ export const azureServiceCatalog: AzureServiceCatalog = {
         longDescription: 'Highly scalable SQL database with up to 100TB storage and read scale-out replicas.',
         requiredDependencies: ['azure-vnet', 'managed-identity'],
         optionalDependencies: ['key-vault', 'private-endpoints'],
-        conflictsWith: ['cosmos-db'],
+        conflictsWith: [],
         nfrRequirements: ['data-model', 'consistency-level', 'read-write-ratio'],
         architectureRole: 'core',
         pricing: {
@@ -138,7 +139,7 @@ export const azureServiceCatalog: AzureServiceCatalog = {
         longDescription: 'Globally distributed, multi-model database with SLA-backed consistency and availability.',
         requiredDependencies: ['managed-identity'],
         optionalDependencies: ['key-vault', 'private-endpoints'],
-        conflictsWith: ['azure-sql-hyperscale'],
+        conflictsWith: [],
         nfrRequirements: ['data-model', 'consistency-level', 'multi-region'],
         architectureRole: 'core',
         pricing: {
@@ -556,6 +557,28 @@ export const azureServiceCatalog: AzureServiceCatalog = {
         },
         tags: ['load-balancing', 'ha', 'layer4', 'health-probes'],
         documentation: 'https://docs.microsoft.com/azure/load-balancer/'
+      },
+      {
+        id: 'app-gateway',
+        name: 'Azure Application Gateway',
+        category: 'networking',
+        tier: 'PaaS',
+        description: 'Layer 7 application gateway with WAF and path routing',
+        longDescription: 'Managed Layer 7 load balancer with web application firewall (WAF), URL-based routing, and TLS termination.',
+        requiredDependencies: ['azure-vnet'],
+        optionalDependencies: ['key-vault', 'private-endpoints'],
+        conflictsWith: [],
+        nfrRequirements: ['expected-rps', 'network-posture'],
+        architectureRole: 'supporting',
+        pricing: {
+          tier: 'Standard_v2/WAF_v2',
+          estimate: '$150/month + requests',
+          unit: 'base + requests',
+          calculator: 'https://azure.microsoft.com/pricing/details/application-gateway/'
+        },
+        tags: ['ingress', 'waf', 'l7', 'routing'],
+        documentation: 'https://learn.microsoft.com/azure/application-gateway/overview',
+        availability: { public: true, gov: true }
       },
       {
         id: 'nsg',

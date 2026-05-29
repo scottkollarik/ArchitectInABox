@@ -3,34 +3,29 @@ import { useProject } from '../context/ProjectContext'
 import AzureRegionSelector from '../modules/cloud-architecture/components/inputs/AzureRegionSelector'
 import BlueprintImportButton from '../modules/cloud-architecture/components/BlueprintImportButton'
 import { nfrRecipes } from '../modules/cloud-architecture/data/recipes'
-import { useAuth } from '../auth/EntraAuthProvider'
-import { buildAuthHeaders, getApiBase } from '../utils/apiClient'
-import CopyableNotice from './CopyableNotice'
 import ToggleSwitch from './ToggleSwitch'
+import type { ProjectProfile } from '../modules/cloud-architecture/types'
 
-const defaultProfileState = {
-  level: 'starter' as const,
-  size: 'M' as const,
-  criticality: 'dev/test' as const,
+const defaultProfileState: ProjectProfile = {
+  level: 'starter',
+  size: 'M',
+  criticality: 'dev/test',
   useWafBaseline: true,
   wafAdaptiveAdditions: false
 }
 
 const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
-  const { currentProject, updateProject } = useProject()
-  const auth = useAuth()
+  const { currentProject, updateProject, refreshProjects } = useProject()
   const [cloudFamily, setCloudFamily] = useState<'public' | 'gov'>('public')
   const [regionSelection, setRegionSelection] = useState<any>({})
   const [residencyPolicy, setResidencyPolicy] = useState<'no-restriction'|'in-country'|'in-geo'|'custom'>('no-restriction')
   const [residencyCountries, setResidencyCountries] = useState<string[]>([])
-  const [profile, setProfile] = useState({ ...defaultProfileState })
+  const [profile, setProfile] = useState<ProjectProfile>({ ...defaultProfileState })
   const [recipeId, setRecipeId] = useState<string>('')
   const [projectName, setProjectName] = useState('')
   const [projectDescription, setProjectDescription] = useState('')
   const [editingIdentity, setEditingIdentity] = useState(false)
-  const [migrationStatus, setMigrationStatus] = useState<'idle'|'success'|'error'>('idle')
-  const [migrationMessage, setMigrationMessage] = useState<string>('')
-  const [migrationDetails, setMigrationDetails] = useState<string>('')
+  const [isRefreshingData, setIsRefreshingData] = useState(false)
 
   // App Log (stored per-project in localStorage)
   type AppLogEntry = { ts: string; type: string; message: string; details?: string }
@@ -93,6 +88,21 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
       profile: { ...(profile as any), recipe: recipeId || undefined },
     })
     onClose()
+  }
+
+  const handleRefreshFromServer = async () => {
+    if (isRefreshingData) return
+    try {
+      setIsRefreshingData(true)
+      await refreshProjects()
+      addLog('sync', 'Reloaded project from Cosmos DB')
+    } catch (error: any) {
+      const message = error?.message || 'Unknown error'
+      addLog('sync-error', `Failed to refresh from Cosmos DB: ${message}`)
+      alert(`Failed to refresh from Cosmos DB: ${message}`)
+    } finally {
+      setIsRefreshingData(false)
+    }
   }
 
   return (
@@ -210,108 +220,21 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
               )}
             </div>
 
-            {/* Migration to Backend */}
+            {/* Data Sync */}
             <div className="mt-4 p-3 border border-architect-gray-200 dark:border-gray-800 rounded bg-architect-gray-50 dark:bg-gray-900/60">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-semibold text-architect-gray-900 dark:text-gray-100">Migrate Local Data to Backend</div>
-                  <div className="text-xs text-architect-gray-600 dark:text-gray-400">Upsert your local projects and NFRs into the backend database (MongoDB). Includes defaults for owner scope and user.</div>
+                  <div className="text-sm font-semibold text-architect-gray-900 dark:text-gray-100">Cloud Sync</div>
+                  <div className="text-xs text-architect-gray-600 dark:text-gray-400">Project changes are automatically saved to Cosmos DB. Use refresh to pull the latest snapshot.</div>
                 </div>
                 <button
-                  onClick={async () => {
-                    try {
-                      setMigrationStatus('idle'); setMigrationMessage(''); setMigrationDetails('')
-                      const apiBase = getApiBase()
-                      const meHeaders = await buildAuthHeaders(auth)
-                      const meRes = await fetch(`${apiBase}/api/me`, { headers: meHeaders })
-                      if (!meRes.ok) throw new Error('Failed to resolve user')
-                      const me = await meRes.json()
-                      const raw = localStorage.getItem('architect-projects')
-                      const projects = raw ? JSON.parse(raw) : []
-                      // Ensure Technologoo exists at least once
-                      const hasTechnologoo = projects.some((p: any) => (p.name || '').toLowerCase() === 'technologoo')
-                      if (!hasTechnologoo) {
-                        projects.push({
-                          id: `project-${Date.now()}`,
-                          name: 'Technologoo',
-                          description: 'Initial project',
-                          createdAt: new Date().toISOString(),
-                          lastModified: new Date().toISOString(),
-                          nfrAssessment: []
-                        })
-                      }
-                      let migrated = 0
-                      const migratedIds: string[] = []
-                      for (const p of projects) {
-                        const projectDto = {
-                          id: p.id,
-                          ownerScope: 'user',
-                          ownerId: me.id || auth.objectId || me.email || auth.email || 'dev-user-1',
-                          orgId: null,
-                          name: p.name,
-                          description: p.description || null,
-                          profile: p.profile || null,
-                          cloud: p.cloud || null,
-                          blueprintAssociation: p.blueprintAssociation || null,
-                          constraints: p.constraints || null,
-                          schemaVersion: 1,
-                          createdAt: p.createdAt || new Date().toISOString(),
-                          lastModified: p.lastModified || new Date().toISOString()
-                        }
-                        const upsert = await fetch(`${apiBase}/api/projects`, {
-                          method: 'POST',
-                          headers: await buildAuthHeaders(auth, { 'Content-Type': 'application/json' }),
-                          body: JSON.stringify(projectDto)
-                        })
-                        if (!upsert.ok) {
-                          const errText = await upsert.text().catch(()=> '')
-                          throw new Error(`Failed to upsert project ${p.name}: [${upsert.status}] ${errText}`)
-                        }
-                        const sections = Array.isArray(p.nfrAssessment) ? p.nfrAssessment : (p.nfrAssessment || [])
-                        const nfrBody = {
-                          id: p.id,
-                          projectId: p.id,
-                          sections,
-                          completionStatus: {},
-                          schemaVersion: 1,
-                          createdAt: new Date().toISOString(),
-                          lastModified: new Date().toISOString()
-                        }
-                        const putNfr = await fetch(`${apiBase}/api/projects/${encodeURIComponent(p.id)}/nfr`, {
-                          method: 'PUT',
-                          headers: await buildAuthHeaders(auth, { 'Content-Type': 'application/json' }),
-                          body: JSON.stringify(nfrBody)
-                        })
-                        if (!putNfr.ok) {
-                          const errText2 = await putNfr.text().catch(()=> '')
-                          throw new Error(`Failed to save NFR for ${p.name}: [${putNfr.status}] ${errText2}`)
-                        }
-                        migrated += 1
-                        migratedIds.push(p.id)
-                      }
-                      setMigrationStatus('success')
-                      setMigrationMessage(`Migration complete. ${migrated} project(s) migrated to backend.`)
-                      setMigrationDetails(migratedIds.length ? `Migrated project IDs:\n${migratedIds.join('\n')}` : '')
-                    } catch (e: any) {
-                      setMigrationStatus('error')
-                      setMigrationMessage(`Migration failed: ${e?.message || e}`)
-                      setMigrationDetails((e?.stack || '').toString())
-                    }
-                  }}
-                  className="text-xs px-2 py-1 rounded border border-architect-gray-300 dark:border-gray-700 text-architect-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 transition-colors"
+                  onClick={handleRefreshFromServer}
+                  disabled={isRefreshingData}
+                  className="text-xs px-2 py-1 rounded border border-architect-gray-300 dark:border-gray-700 text-architect-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 transition-colors disabled:opacity-60"
                 >
-                  Migrate
+                  {isRefreshingData ? 'Refreshing…' : 'Refresh from Cosmos'}
                 </button>
               </div>
-              {migrationStatus !== 'idle' && (
-                <CopyableNotice
-                  variant={migrationStatus === 'success' ? 'success' : 'error'}
-                  title={migrationStatus === 'success' ? 'Migration' : 'Migration Error'}
-                  message={migrationMessage}
-                  details={migrationDetails}
-                  className="mt-3"
-                />
-              )}
             </div>
 
             {/* App Log */}
@@ -319,7 +242,7 @@ const ProjectSettingsModal: React.FC<{ open: boolean; onClose: () => void }> = (
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold text-architect-gray-900 dark:text-gray-100">App Log</div>
-                  <div className="text-xs text-architect-gray-600 dark:text-gray-400">Quietly records background actions like pricing refreshes, blueprint imports, and migrations.</div>
+                  <div className="text-xs text-architect-gray-600 dark:text-gray-400">Quietly records background actions like pricing refreshes, blueprint imports, and sync operations.</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button type="button"

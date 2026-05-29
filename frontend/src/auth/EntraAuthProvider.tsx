@@ -3,12 +3,25 @@ import { PublicClientApplication, Configuration, AccountInfo, RedirectRequest, S
 
 const authEnabled = (import.meta.env.VITE_ENABLE_ENTRA_AUTH ?? 'true').toLowerCase() !== 'false'
 
+const apiScope = import.meta.env.VITE_OAUTH_SCOPE || (import.meta.env.VITE_OAUTH_CLIENT_ID ? `api://${import.meta.env.VITE_OAUTH_CLIENT_ID}/user_impersonation` : undefined)
+
+const basePath = import.meta.env.VITE_BASE_PATH || '/'
+const normalizedBasePath = basePath === '/' ? '' : `/${basePath.replace(/^\/+|\/+$/g, '')}`
+const withBasePath = (path: string) => {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${window.location.origin}${normalizedBasePath}${normalizedPath}`
+}
+
+const defaultScopes = ['openid', 'profile', 'email']
+const graphScope = 'User.Read'
+const effectiveScopes = apiScope ? [...defaultScopes, graphScope, apiScope] : [...defaultScopes, graphScope]
+
 const msalConfig: Configuration = {
   auth: {
     clientId: import.meta.env.VITE_OAUTH_CLIENT_ID || '',
     authority: `https://login.microsoftonline.com/${import.meta.env.VITE_OAUTH_TENANT_ID || 'common'}`,
-    redirectUri: import.meta.env.VITE_OAUTH_REDIRECT_URI || `${window.location.origin}/auth/callback`,
-    postLogoutRedirectUri: window.location.origin,
+    redirectUri: import.meta.env.VITE_OAUTH_REDIRECT_URI || withBasePath('/auth/callback'),
+    postLogoutRedirectUri: normalizedBasePath ? `${window.location.origin}${normalizedBasePath}/` : `${window.location.origin}/`,
   },
   cache: {
     cacheLocation: 'localStorage',
@@ -105,14 +118,7 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
       return
     }
     const loginRequest: RedirectRequest = {
-      scopes: [
-        'openid',
-        'profile',
-        'email',
-        'User.Read',
-        // Add your API scopes here:
-        // `api://${import.meta.env.VITE_OAUTH_CLIENT_ID}/access_as_user`
-      ],
+      scopes: effectiveScopes,
       prompt: 'select_account',
     }
 
@@ -153,12 +159,17 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
     if (!authEnabled) return null
     if (!user || !msalInstance) return null
 
+    // Request ONLY the API scope, not Graph scopes
+    // When you mix scopes, MSAL returns a token for one resource at a time
+    const apiOnlyScopes = apiScope ? [apiScope] : []
+
+    if (apiOnlyScopes.length === 0) {
+      console.warn('No API scope configured - cannot get access token for backend')
+      return null
+    }
+
     const silentRequest: SilentRequest = {
-      scopes: [
-        'User.Read',
-        // Add your API scopes here:
-        // `api://${import.meta.env.VITE_OAUTH_CLIENT_ID}/access_as_user`
-      ],
+      scopes: apiOnlyScopes,
       account: user,
     }
 
@@ -167,15 +178,9 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
      return response.accessToken
     } catch (error) {
       console.error('Silent token acquisition failed:', error)
-
-      // If silent request fails, try interactive
-      try {
-        await msalInstance.acquireTokenRedirect(silentRequest)
-        return null
-      } catch (interactiveError) {
-        console.error('Interactive token acquisition failed:', interactiveError)
-        return null
-      }
+      // acquireTokenRedirect will redirect the page, so we can't return a token
+      // Just return null and let the calling code handle the missing token
+      return null
     }
   }
 

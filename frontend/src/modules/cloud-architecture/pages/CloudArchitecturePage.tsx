@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import NFRAssessmentForm from '../components/NFRAssessmentForm'
 import AzureServicesBrowser from '../components/AzureServicesBrowser'
@@ -6,14 +6,15 @@ import ArchitectureCanvas from '../components/ArchitectureCanvas'
 import { useProject } from '../../../context/ProjectContext'
 import { getSectionCompletion, nfrSections } from '../data/nfrData'
 import type { NFRSection } from '../types'
-import { generateRecommendations, getServiceById } from '../data/azureServices'
+import { generateRecommendations, getServiceById, getAllServices } from '../data/azureServices'
+import { estimateMonthlyCost } from '../utils/costEstimator'
 import { ChevronDownIcon, ChevronRightIcon, CurrencyDollarIcon, PlusIcon } from '@heroicons/react/24/outline'
 import AlignmentReportDrawer from '../components/AlignmentReportDrawer'
 
 const CloudArchitecturePage: React.FC = () => {
   const [showNfr, setShowNfr] = useState(true)
   const [showSuggestions, setShowSuggestions] = useState(true)
-  const [showMessages, setShowMessages] = useState(true)
+  const [showMessages, setShowMessages] = useState(false)
   const [messages, setMessages] = useState<{ id: string; message: string; type: 'info' | 'warning' | 'success' }[]>([])
   const [showReport, setShowReport] = useState(false)
   const location = useLocation()
@@ -45,24 +46,61 @@ const CloudArchitecturePage: React.FC = () => {
 
   // (Reverted) Removed complex flight animation to stabilize rendering
   // Derived counts, alignment, and cost from project state for header
-  const selectedIds = useMemo(() => new Set(
+  const contextSelectedIds = useMemo(() => new Set(
     (currentProject?.architecture?.items || []).map(it => it.id)
   ), [currentProject?.architecture?.items])
 
-  const servicesCount = selectedIds.size
+  const [liveSelectedIds, setLiveSelectedIds] = useState<Set<string>>(contextSelectedIds)
+  const [pendingAddIds, setPendingAddIds] = useState<Set<string>>(new Set())
+  const [autoAddState, setAutoAddState] = useState<{ active: boolean; lastIds: string[] }>({ active: false, lastIds: [] })
+
+  useEffect(() => {
+    setLiveSelectedIds(new Set(contextSelectedIds))
+    setPendingAddIds(new Set())
+    setAutoAddState({ active: false, lastIds: [] })
+  }, [contextSelectedIds])
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail as { ids?: string[] } | undefined
+      if (!detail || !Array.isArray(detail.ids)) return
+      const incoming = new Set(detail.ids)
+      setLiveSelectedIds(incoming)
+      setPendingAddIds(prev => {
+        if (prev.size === 0) return prev
+        const next = new Set(prev)
+        incoming.forEach(id => next.delete(id))
+        return next
+      })
+      setAutoAddState(prev => prev.active ? { active: prev.active, lastIds: prev.lastIds } : prev)
+    }
+    window.addEventListener('arch-services-changed', handler as EventListener)
+    return () => window.removeEventListener('arch-services-changed', handler as EventListener)
+  }, [])
+
+  const enqueueAdd = useCallback((ids: string[], auto = false) => {
+    if (!ids || ids.length === 0) return
+    setPendingAddIds(prev => {
+      const next = new Set(prev)
+      ids.forEach(id => next.add(id))
+      return next
+    })
+    if (auto) {
+      setAutoAddState({ active: true, lastIds: ids })
+    }
+    ids.forEach(id => {
+      try {
+        window.dispatchEvent(new CustomEvent('arch-add-service', { detail: { id } }))
+      } catch {}
+    })
+  }, [])
+
+  const servicesCount = liveSelectedIds.size
 
   const estimatedMonthlyCost = useMemo(() => {
-    let total = 0
-    selectedIds.forEach(id => {
-      const svc = getServiceById(id)
-      if (svc) {
-        const costString = svc.pricing.estimate.replace(/[^0-9.]/g, '')
-        const cost = parseFloat(costString) || 0
-        total += cost
-      }
-    })
-    return total
-  }, [selectedIds])
+    const services = getAllServices().filter(s => liveSelectedIds.has(s.id))
+    return estimateMonthlyCost(services, currentProject || undefined)
+  }, [liveSelectedIds, currentProject])
 
   const summarizeNfr = (sections?: NFRSection[]) => {
     if (!sections) return {}
@@ -99,28 +137,28 @@ const CloudArchitecturePage: React.FC = () => {
         profile: currentProject?.profile,
         cloud: currentProject?.cloud
       }) || []
-      const matched = recs.filter(s => s && selectedIds.has(s.id))
-      const missing = recs.filter(s => s && !selectedIds.has(s.id))
+      const matched = recs.filter(s => s && liveSelectedIds.has(s.id))
+      const missing = recs.filter(s => s && !liveSelectedIds.has(s.id))
       const pct = recs.length ? Math.round((matched.length / recs.length) * 100) : 100
       return { matched, missing, pct }
     } catch {
       return { matched: [], missing: [], pct: 100 }
     }
-  }, [currentProject, selectedIds])
+  }, [currentProject, liveSelectedIds])
 
   // Contextual suggestions: optional dependencies of currently selected services not yet added
   const contextualSuggestions = useMemo(() => {
     const ids: string[] = []
-    selectedIds.forEach(id => {
+    liveSelectedIds.forEach(id => {
       const svc = getServiceById(id)
       if (svc && Array.isArray(svc.optionalDependencies)) {
-        svc.optionalDependencies.forEach(dep => { if (!selectedIds.has(dep)) ids.push(dep) })
+        svc.optionalDependencies.forEach(dep => { if (!liveSelectedIds.has(dep) && !pendingAddIds.has(dep)) ids.push(dep) })
       }
     })
     // de-duplicate and map to services
     const unique = Array.from(new Set(ids))
     return unique.map(getServiceById).filter(Boolean) as any[]
-  }, [selectedIds])
+  }, [liveSelectedIds, pendingAddIds])
 
   // Merge NFR-based missing and contextual suggestions (no duplicates)
   const mergedSuggestions = useMemo(() => {
@@ -129,11 +167,31 @@ const CloudArchitecturePage: React.FC = () => {
     contextualSuggestions.forEach((s: any) => { if (s && !byId.has(s.id)) byId.set(s.id, s) })
     // Apply constraints
     const cons = currentProject?.constraints
-    let list = Array.from(byId.values())
+    const suppressed = new Set<string>()
+    liveSelectedIds.forEach(id => suppressed.add(id))
+    pendingAddIds.forEach(id => suppressed.add(id))
+    let list = Array.from(byId.values()).filter(s => !suppressed.has(s.id))
     if (cons?.denyServiceIds?.length) list = list.filter(s => !cons!.denyServiceIds!.includes(s.id))
     if (cons?.allowServiceIds?.length) list = list.filter(s => cons!.allowServiceIds!.includes(s.id))
     return list
-  }, [alignment.missing, contextualSuggestions])
+  }, [alignment.missing, contextualSuggestions, liveSelectedIds, pendingAddIds, currentProject?.constraints])
+
+  useEffect(() => {
+    if (!autoAddState.active) return
+    if (pendingAddIds.size > 0) return
+    if (mergedSuggestions.length === 0) {
+      setAutoAddState({ active: false, lastIds: [] })
+      return
+    }
+    const nextIds = mergedSuggestions.map(s => s.id)
+    const lastSet = new Set(autoAddState.lastIds)
+    const isSame = nextIds.length === autoAddState.lastIds.length && nextIds.every(id => lastSet.has(id))
+    if (isSame) {
+      setAutoAddState({ active: false, lastIds: [] })
+      return
+    }
+    enqueueAdd(nextIds, true)
+  }, [autoAddState, pendingAddIds, mergedSuggestions, enqueueAdd])
 
   // Listen for architecture messages from the canvas and display in header
   useEffect(() => {
@@ -196,13 +254,11 @@ const CloudArchitecturePage: React.FC = () => {
           {/* Close strip header container */}
           </div>
           {/* NFR content inside the same bordered container */}
-          {showNfr && (
-            <div className="bg-white dark:bg-gray-800">
-              <div className="pt-4 pb-5 px-5">
-                <NFRAssessmentForm />
-              </div>
+          <div className={`${showNfr ? 'block' : 'hidden'} bg-white dark:bg-gray-800`} aria-hidden={!showNfr}>
+            <div className="pt-4 pb-5 px-5">
+              <NFRAssessmentForm />
             </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -262,88 +318,105 @@ const CloudArchitecturePage: React.FC = () => {
                   </div>
                 </div>
                 {/* Suggestions thin panel under header */}
-                <div className="border-t border-architect-gray-300 mt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowSuggestions(s => !s)}
-                    className="w-full flex items-center gap-2 text-left px-0 py-1.5 text-xs text-architect-gray-800 hover:bg-architect-gray-50"
-                  >
-                    {showSuggestions ? (
-                      <ChevronDownIcon className="w-3.5 h-3.5 text-architect-gray-500" />
-                    ) : (
-                      <ChevronRightIcon className="w-3.5 h-3.5 text-architect-gray-500" />
-                    )}
-                    <span className="font-medium">Suggestions</span>
-                    {mergedSuggestions.length > 0 && (
-                      <span className="ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full border border-azure-blue-300 text-azure-blue-700">{mergedSuggestions.length}</span>
-                    )}
-                  </button>
-                  {showSuggestions && mergedSuggestions.length > 0 && (
-                    <div className="pt-1 pb-2">
-                      <div className="text-[11px] text-architect-gray-700">
-                        {mergedSuggestions.slice(0,4).map((s) => (
-                          <span key={s.id} className="inline-flex items-center px-2 py-0.5 border border-azure-blue-300 text-azure-blue-700 rounded-full mr-1 mt-1">
-                            {s.name}
-                            <button
-                              onClick={() => {
-                                try { window.dispatchEvent(new CustomEvent('arch-add-service', { detail: { id: s.id } })) } catch {}
-                              }}
-                              className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full border border-azure-blue-300 text-azure-blue-700 hover:bg-white"
-                              title={`Add ${s.name}`}
+                {mergedSuggestions.length > 0 && (
+                  <div className="border-t border-orange-200 mt-2 bg-orange-50/60 rounded-b-lg shadow-sm dark:border-orange-500/40 dark:bg-orange-900/15">
+                    <button
+                      type="button"
+                      onClick={() => setShowSuggestions(s => !s)}
+                      className="w-full flex items-center gap-2 text-left px-2 py-1.5 text-xs text-orange-900 font-medium hover:bg-orange-100/80 dark:text-orange-200 dark:hover:bg-orange-900/30"
+                    >
+                      {showSuggestions ? (
+                        <ChevronDownIcon className="w-3.5 h-3.5 text-orange-500 dark:text-orange-300" />
+                      ) : (
+                        <ChevronRightIcon className="w-3.5 h-3.5 text-orange-500 dark:text-orange-300" />
+                      )}
+                      <span>Recommended Resources</span>
+                      <span className="ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full border border-orange-200 bg-white/70 text-orange-700 shadow-sm dark:border-orange-400/70 dark:bg-orange-900/40 dark:text-orange-200">{mergedSuggestions.length}</span>
+                    </button>
+                    {showSuggestions && (
+                      <div className="pt-1 pb-2">
+                        <div className="px-2 text-[11px] text-orange-900 dark:text-orange-200">
+                          {mergedSuggestions.map((s) => (
+                            <span
+                              key={s.id}
+                              className="inline-flex items-center px-2 py-0.5 border border-orange-200 bg-orange-50 text-orange-700 rounded-full mr-1 mt-1 shadow-sm dark:border-orange-500/60 dark:bg-orange-900/30 dark:text-orange-200"
                             >
-                              <PlusIcon className="w-3 h-3" />
-                            </button>
-                          </span>
-                        ))}
-                        {mergedSuggestions.length > 4 && (
-                          <span className="text-architect-gray-500 ml-1">+{mergedSuggestions.length - 4} more</span>
-                        )}
-                      </div>
-                      <div className="mt-1 flex items-center justify-between">
-                        <button
-                          onClick={() => {
-                            try {
-                              const ids = mergedSuggestions.map(s => s.id)
-                              window.dispatchEvent(new CustomEvent('services-filter-missing', { detail: { ids } }))
-                            } catch {}
-                          }}
-                          className="text-[11px] px-2 py-0.5 rounded border border-azure-blue-300 text-azure-blue-700 hover:bg-white"
-                          title="Filter the services browser to show these"
-                        >
-                          Filter missing
-                        </button>
-                        <span className="text-[10px] text-architect-gray-500">Add any of these to improve alignment.</span>
-                      </div>
-                    </div>
-                  )}
-                  {/* Messages/notifications panel */}
-                  {messages.length > 0 && (
-                    <div className="pt-1 pb-2">
-                      <button
-                        onClick={() => setShowMessages(v => !v)}
-                        className="text-[11px] px-2 py-0.5 rounded border border-architect-gray-300 dark:border-gray-600 text-architect-gray-700 dark:text-gray-300 hover:bg-architect-gray-50 dark:hover:bg-gray-700"
-                      >
-                        {showMessages ? 'Hide Messages' : 'Show Messages'}
-                        {!showMessages && (
-                          <span className="ml-1 inline-flex items-center justify-center w-4 h-4 text-[10px] rounded-full bg-slate-600 dark:bg-slate-500 text-white align-middle">{messages.length}</span>
-                        )}
-                      </button>
-                      {showMessages && (
-                        <div className="mt-1 space-y-1">
-                          {messages.map(m => (
-                            <div key={m.id} className={`text-[11px] px-2 py-1 rounded ${
-                              m.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' :
-                              m.type === 'warning' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
-                              'bg-blue-50 text-blue-700 border border-blue-200'
-                            }`}>
-                              {m.message}
-                            </div>
+                              {s.name}
+                              <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-orange-200 text-orange-900 font-semibold dark:bg-orange-800 dark:text-orange-100">
+                                {s.tier}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  enqueueAdd([s.id])
+                                }}
+                                className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full border border-orange-300 bg-white/70 text-orange-600 hover:bg-orange-100 dark:border-orange-400/70 dark:bg-orange-900/40 dark:text-orange-200 dark:hover:bg-orange-800/40"
+                                title="Add service"
+                                aria-label={`Add ${s.name} service`}
+                              >
+                                <PlusIcon className="w-3 h-3" />
+                              </button>
+                            </span>
                           ))}
                         </div>
+                        <div className="mt-1 px-2 flex flex-wrap items-center gap-2 justify-between">
+                          <button
+                            onClick={() => {
+                              try {
+                                const ids = mergedSuggestions.map(s => s.id)
+                                window.dispatchEvent(new CustomEvent('services-filter-missing', { detail: { ids } }))
+                              } catch {}
+                            }}
+                            className="text-[11px] px-2 py-0.5 rounded border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 shadow-sm dark:border-orange-500/60 dark:bg-orange-900/30 dark:text-orange-200 dark:hover:bg-orange-800/30"
+                            title="Filter the services browser to show these"
+                          >
+                            Filter missing
+                          </button>
+                          <span className="text-[10px] text-orange-700 dark:text-orange-200">Add any of these to improve alignment.</span>
+                        </div>
+                        <div className="mt-2 px-2 pt-2 border-t border-orange-200 flex justify-end">
+                          <button
+                            onClick={() => {
+                              if (mergedSuggestions.length === 0) return
+                              const idsToAdd = mergedSuggestions.map(s => s.id)
+                              enqueueAdd(idsToAdd, true)
+                            }}
+                            className="text-[11px] px-3 py-1 rounded border border-orange-300 bg-gradient-to-r from-orange-200 via-orange-100 to-orange-50 text-orange-800 font-semibold hover:from-orange-300 hover:via-orange-200 hover:to-orange-100 shadow-md dark:border-orange-500/60 dark:from-orange-900/40 dark:via-orange-900/30 dark:to-orange-900/20 dark:text-orange-100 dark:hover:from-orange-800/40 dark:hover:via-orange-800/30 dark:hover:to-orange-800/20"
+                            title="Add all suggested services"
+                          >
+                            Add all recommended services
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Messages/notifications panel */}
+                {messages.length > 0 && (
+                  <div className="pt-1 pb-2 border-t border-architect-gray-200 mt-2">
+                    <button
+                      onClick={() => setShowMessages(v => !v)}
+                      className="text-[11px] px-2 py-0.5 rounded border border-architect-gray-300 dark:border-gray-600 text-architect-gray-700 dark:text-gray-300 hover:bg-architect-gray-50 dark:hover:bg-gray-700"
+                    >
+                      {showMessages ? 'Hide Messages' : 'Show Messages'}
+                      {!showMessages && (
+                        <span className="ml-1 inline-flex items-center justify-center w-4 h-4 text-[10px] rounded-full bg-slate-600 dark:bg-slate-500 text-white align-middle">{messages.length}</span>
                       )}
-                    </div>
-                  )}
-                </div>
+                    </button>
+                    {showMessages && (
+                      <div className="mt-1 space-y-1">
+                        {messages.map(m => (
+                          <div key={m.id} className={`text-[11px] px-2 py-1 rounded ${
+                            m.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' :
+                            m.type === 'warning' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                            'bg-blue-50 text-blue-700 border border-blue-200'
+                          }`}>
+                            {m.message}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="overflow-y-auto max-h-[calc(100vh-220px)]">
                 <ArchitectureCanvas />

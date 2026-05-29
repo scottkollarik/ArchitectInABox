@@ -114,7 +114,7 @@ verify_containerapp_complete_state() {
 verify_cosmos_complete_state() {
     local COSMOS_NAME="$1"
     local RG_NAME="$2"
-    local EXPECTED_CONTAINERS=("projects" "nfrAssessments" "logs")
+    local EXPECTED_COLLECTIONS=("projects" "nfrAssessments" "users" "logs")
 
     echo "🔍 Verifying CosmosDB state: $COSMOS_NAME"
 
@@ -125,25 +125,25 @@ verify_cosmos_complete_state() {
     fi
 
     # Check database exists
-    if ! az cosmosdb sql database show --account-name "$COSMOS_NAME" --resource-group "$RG_NAME" --name "tapdb" &>/dev/null; then
+    if ! az cosmosdb mongodb database show --account-name "$COSMOS_NAME" --resource-group "$RG_NAME" --name "tapdb" &>/dev/null; then
         echo "   ❌ Database 'tapdb' does not exist"
         return 2
     fi
 
-    # Check required containers
-    local MISSING_CONTAINERS=()
-    for container in "${EXPECTED_CONTAINERS[@]}"; do
-        if ! az cosmosdb sql container show --account-name "$COSMOS_NAME" --resource-group "$RG_NAME" --database-name "tapdb" --name "$container" &>/dev/null; then
-            MISSING_CONTAINERS+=("$container")
+    # Check required collections
+    local MISSING_COLLECTIONS=()
+    for collection in "${EXPECTED_COLLECTIONS[@]}"; do
+        if ! az cosmosdb mongodb collection show --account-name "$COSMOS_NAME" --resource-group "$RG_NAME" --database-name "tapdb" --name "$collection" &>/dev/null; then
+            MISSING_COLLECTIONS+=("$collection")
         fi
     done
 
-    if [[ ${#MISSING_CONTAINERS[@]} -gt 0 ]]; then
-        echo "   ⚠️  Missing containers: ${MISSING_CONTAINERS[*]}"
+    if [[ ${#MISSING_COLLECTIONS[@]} -gt 0 ]]; then
+        echo "   ⚠️  Missing collections: ${MISSING_COLLECTIONS[*]}"
         return 2
     fi
 
-    echo "   ✅ CosmosDB complete with all required containers"
+    echo "   ✅ CosmosDB complete with all required collections"
     return 0
 }
 
@@ -215,13 +215,11 @@ verify_resource_permissions_complete() {
 
     # Check CosmosDB permissions (if Cosmos name provided)
     if [[ -n "$COSMOS_NAME" ]]; then
-        local COSMOS_ASSIGNMENTS=$(az cosmosdb sql role assignment list \
-            --account-name "$COSMOS_NAME" \
-            --resource-group "$RG_NAME" \
-            --query "[?principalId=='$PRINCIPAL_ID'] | length(@)" -o tsv 2>/dev/null)
+        local COSMOS_SCOPE=$(az cosmosdb show --name "$COSMOS_NAME" --resource-group "$RG_NAME" --query id -o tsv)
+        local COSMOS_ASSIGNMENTS=$(az role assignment list --assignee "$PRINCIPAL_ID" --scope "$COSMOS_SCOPE" --include-inherited --query "length(@)" -o tsv 2>/dev/null)
 
         if [[ -z "$COSMOS_ASSIGNMENTS" || "$COSMOS_ASSIGNMENTS" -eq 0 ]]; then
-            ISSUES+=("No CosmosDB permissions found")
+            ISSUES+=("No CosmosDB RBAC assignments found")
         fi
     fi
 

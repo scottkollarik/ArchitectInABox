@@ -64,6 +64,7 @@ docker buildx build \
   --build-arg VITE_OAUTH_CLIENT_ID="${VITE_OAUTH_CLIENT_ID:-}" \
   --build-arg VITE_OAUTH_TENANT_ID="${VITE_OAUTH_TENANT_ID:-}" \
   --build-arg VITE_OAUTH_REDIRECT_URI="${VITE_OAUTH_REDIRECT_URI:-}" \
+  --build-arg VITE_OAUTH_SCOPE="${VITE_OAUTH_SCOPE:-}" \
   -t "${REGISTRY}/tap-frontend:${TAG}" \
   frontend \
   "${FRONTEND_OUTPUT[@]}"

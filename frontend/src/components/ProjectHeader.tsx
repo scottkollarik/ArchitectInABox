@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { 
   ChevronDownIcon, 
   PlusIcon, 
@@ -16,22 +16,47 @@ const ProjectHeader: React.FC<{ compact?: boolean }> = ({ compact = false }) => 
     projects, 
     createProject, 
     loadProject, 
-    deleteProject 
+    deleteProject,
+    refreshProjects 
   } = useProject()
   
   const [showProjectMenu, setShowProjectMenu] = useState(false)
   const [showNewProjectModal, setShowNewProjectModal] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDescription, setNewProjectDescription] = useState('')
+  const [isCreatingProject, setIsCreatingProject] = useState(false)
+  const [createProjectError, setCreateProjectError] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
 
+  useEffect(() => {
+    if (!showNewProjectModal) {
+      setCreateProjectError(null)
+      setIsCreatingProject(false)
+    }
+  }, [showNewProjectModal])
+
   const handleCreateProject = async () => {
-    if (!newProjectName.trim()) return
-    
-    await createProject(newProjectName.trim(), newProjectDescription.trim())
-    setShowNewProjectModal(false)
-    setNewProjectName('')
-    setNewProjectDescription('')
+    if (isCreatingProject) return
+    const name = newProjectName.trim()
+    const description = newProjectDescription.trim()
+    if (!name) return
+
+    setIsCreatingProject(true)
+    setCreateProjectError(null)
+    try {
+      await createProject(name, description)
+      await refreshProjects()
+      setShowProjectMenu(false)
+      setShowNewProjectModal(false)
+      setNewProjectName('')
+      setNewProjectDescription('')
+    } catch (error) {
+      console.error('Failed to create project', error)
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      setCreateProjectError(`We could not create the project. ${message}. Please confirm the backend is running and try again.`)
+    } finally {
+      setIsCreatingProject(false)
+    }
   }
 
   const formatDate = (date: Date) => {
@@ -320,6 +345,11 @@ const ProjectHeader: React.FC<{ compact?: boolean }> = ({ compact = false }) => 
               </div>
 
               <div className="space-y-4">
+                {createProjectError && (
+                  <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                    {createProjectError}
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-architect-gray-700 dark:text-gray-300 mb-1">
                     Project Name *
@@ -350,17 +380,24 @@ const ProjectHeader: React.FC<{ compact?: boolean }> = ({ compact = false }) => 
 
               <div className="flex space-x-3 mt-6">
                 <button
+                  type="button"
                   onClick={() => setShowNewProjectModal(false)}
                   className="flex-1 px-4 py-2 text-architect-gray-700 dark:text-gray-200 bg-architect-gray-100 dark:bg-gray-800 rounded-md hover:bg-architect-gray-200 dark:hover:bg-gray-700 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleCreateProject}
-                  disabled={!newProjectName.trim()}
-                  className="flex-1 px-4 py-2 bg-azure-blue-600 text-white rounded-md hover:bg-azure-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  disabled={isCreatingProject || !newProjectName.trim()}
+                  aria-busy={isCreatingProject}
+                  className={`flex-1 px-4 py-2 rounded-md text-white transition-transform transition-colors duration-150 ${
+                    isCreatingProject
+                      ? 'bg-azure-blue-500 opacity-80 cursor-wait'
+                      : 'bg-azure-blue-600 hover:bg-azure-blue-700 active:translate-y-[1px]'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                  Create Project
+                  {isCreatingProject ? 'Creating…' : 'Create Project'}
                 </button>
               </div>
             </div>

@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { useDrop } from 'react-dnd'
 // icons managed in outer header; none used here
-import type { AzureService, SelectedService, ProjectArchitectureState } from '../types'
+import type { AzureService, SelectedService, ProjectArchitectureState, ProjectProfile } from '../types'
 import { getServiceById, azureServiceCatalog } from '../data/azureServices'
+import { estimateMonthlyCost } from '../utils/costEstimator'
 import { WAF_BASELINE_REASON, WAF_BASELINE_SERVICES, WAF_DYNAMIC_RULES, extractNfrAnswers } from '../data/wafGuidance'
 import type { WafRuleContext } from '../data/wafGuidance'
 import { useProject } from '../../../context/ProjectContext'
@@ -38,9 +39,9 @@ const applyWafAutomation = ({
   autoSet: Set<string>
   project: Project
 }) => {
-  const profile = project.profile || {}
-  const baselineEnabled = profile.useWafBaseline !== false
-  const dynamicEnabled = !!profile.wafAdaptiveAdditions
+  const profile = project.profile as ProjectProfile | undefined
+  const baselineEnabled = profile?.useWafBaseline !== false
+  const dynamicEnabled = !!profile?.wafAdaptiveAdditions
   const answers = extractNfrAnswers(project.nfrAssessment)
   const context: WafRuleContext = { cloudFamily: project.cloud?.cloudFamily || 'public' }
 
@@ -327,14 +328,7 @@ const ArchitectureCanvas: React.FC = () => {
 
   // Grouping by role was replaced by category-based sections
 
-  const calculateEstimatedCost = () => {
-    return selectedServices.reduce((total, service) => {
-      // Simple cost calculation - in reality this would be more complex
-      const costString = service.pricing.estimate.replace(/[^0-9.]/g, '')
-      const cost = parseFloat(costString) || 0
-      return total + cost
-    }, 0)
-  }
+  const calculateEstimatedCost = () => estimateMonthlyCost(selectedServices, currentProject || undefined)
 
   const clearArchitecture = () => {
     setSelectedServices([])
@@ -355,6 +349,13 @@ const ArchitectureCanvas: React.FC = () => {
       }
     })
     return groups
+  }, [selectedServices])
+
+  useEffect(() => {
+    try {
+      const ids = selectedServices.map(s => s.id)
+      window.dispatchEvent(new CustomEvent('arch-services-changed', { detail: { ids } }))
+    } catch {}
   }, [selectedServices])
 
   useEffect(() => {
@@ -399,7 +400,11 @@ const ArchitectureCanvas: React.FC = () => {
 
   // Rehydrate from project on mount/change
   useEffect(() => {
-    if (!currentProject?.architecture) return
+    if (!currentProject?.architecture || !Array.isArray(currentProject.architecture.items) || currentProject.architecture.items.length === 0) {
+      setSelectedServices([])
+      setAutoIncludedServices(new Set())
+      return
+    }
     const items = currentProject.architecture.items
     const rebuilt: SelectedService[] = []
     const auto = new Set<string>()

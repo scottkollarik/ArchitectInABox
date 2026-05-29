@@ -138,8 +138,8 @@ echo "   az cosmosdb keys list --resource-group '$RG_NAME' --name '$COSMOS_ACCOU
 echo "   az storage account show-connection-string --resource-group '$RG_NAME' --name '$STORAGE_ACCOUNT'"
 echo
 echo "2. Update your .env.production file with:"
-echo "   VITE_API_URL=https://$BACKEND_URL"
-echo "   VITE_OAUTH_REDIRECT_URI=https://$FRONTEND_URL/auth/callback"
+echo "   VITE_API_URL=https://$BACKEND_URL/$NAME_PREFIX/api"
+echo "   VITE_OAUTH_REDIRECT_URI=https://$FRONTEND_URL/$NAME_PREFIX/auth/callback"
 echo "   ConnectionStrings__CosmosDB=<cosmos-connection-string>"
 echo "   ConnectionStrings__AzureBlob=<blob-connection-string>"
 echo

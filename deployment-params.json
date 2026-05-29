@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "namePrefix": {
+      "value": "aib"
+    },
+    "appShortName": {
+      "value": "aib"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "backendImage": {
+      "value": "ghcr.io/scottkollarik/tap-backend:latest"
+    },
+    "frontendImage": {
+      "value": "ghcr.io/scottkollarik/tap-frontend:latest"
+    },
+    "enableSearch": {
+      "value": false
+    },
+    "customDomain": {
+      "value": ""
+    },
+    "globalKeyVaultName": {
+      "value": "kv-technologoo-global"
+    },
+    "globalKeyVaultResourceGroup": {
+      "value": "rg_technologoo_global"
+    }
+  }
+}

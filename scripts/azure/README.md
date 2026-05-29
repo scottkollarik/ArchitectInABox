@@ -87,7 +87,7 @@ scripts/azure/
 **What it does**:
 - Creates Container Apps Environment
 - Creates Storage Account for artifacts
-- Creates CosmosDB with containers (projects, nfrAssessments, logs)
+- Creates Cosmos DB for MongoDB with collections (projects, nfrAssessments, users, logs)
 - Creates Container Apps with placeholder images and assigned identities
 
 **Dependencies**: Phase 1 must be completed
@@ -187,6 +187,7 @@ GLOBAL_KEY_VAULT_RG=rg_technologoo_global
 # OAuth Configuration (for Phase 6)
 VITE_OAUTH_CLIENT_ID=your-entra-client-id
 VITE_OAUTH_TENANT_ID=your-entra-tenant-id
+VITE_OAUTH_SCOPE=api://your-entra-client-id/user_impersonation
 EntraAuth__ClientId=your-entra-client-id
 EntraAuth__TenantId=your-entra-tenant-id
 ```

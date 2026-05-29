@@ -30,14 +30,20 @@ resource sa 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   }
 }
 
-// Cosmos DB (NoSQL, Serverless)
+// Cosmos DB (Mongo API, Serverless)
 resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2023-04-15' = {
   name: '${namePrefix}-cosmos'
   location: location
-  kind: 'GlobalDocumentDB'
+  kind: 'MongoDB'
   properties: {
+    apiProperties: {
+      serverVersion: '6.0'
+    }
     databaseAccountOfferType: 'Standard'
     capabilities: [
+      {
+        name: 'EnableMongo'
+      }
       {
         name: 'EnableServerless'
       }
@@ -54,53 +60,64 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2023-04-15' = {
   }
 }
 
-// Cosmos database + containers
-resource db 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2023-04-15' = {
+// Mongo database + collections
+resource mongoDb 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases@2023-04-15' = {
   parent: cosmos
   name: 'tapdb'
   properties: {
-    resource: { id: 'tapdb' }
+    resource: {
+      id: 'tapdb'
+    }
   }
 }
 
-// Cosmos containers
-resource projectsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-04-15' = {
-  parent: db
+resource projectsCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections@2023-04-15' = {
+  parent: mongoDb
   name: 'projects'
   properties: {
     resource: {
       id: 'projects'
-      partitionKey: {
-        paths: [ '/ownerId' ]
-        kind: 'Hash'
+      shardKey: {
+        ownerId: 'Hash'
       }
     }
   }
 }
 
-resource nfrContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-04-15' = {
-  parent: db
+resource nfrCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections@2023-04-15' = {
+  parent: mongoDb
   name: 'nfrAssessments'
   properties: {
     resource: {
       id: 'nfrAssessments'
-      partitionKey: {
-        paths: [ '/projectId' ]
-        kind: 'Hash'
+      shardKey: {
+        projectId: 'Hash'
       }
     }
   }
 }
 
-resource logsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-04-15' = {
-  parent: db
+resource usersCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections@2023-04-15' = {
+  parent: mongoDb
+  name: 'users'
+  properties: {
+    resource: {
+      id: 'users'
+      shardKey: {
+        _id: 'Hash'
+      }
+    }
+  }
+}
+
+resource logsCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections@2023-04-15' = {
+  parent: mongoDb
   name: 'logs'
   properties: {
     resource: {
       id: 'logs'
-      partitionKey: {
-        paths: [ '/projectId' ]
-        kind: 'Hash'
+      shardKey: {
+        projectId: 'Hash'
       }
     }
   }

@@ -113,13 +113,11 @@ if [[ "$PERMISSIONS_NEED_CONFIGURATION" == "true" ]]; then
         fi
 
         echo "🔐 Granting Cosmos DB access to backend identity..."
-        COSMOS_ROLE_ID="00000000-0000-0000-0000-000000000002"
-        az cosmosdb sql role assignment create \
-            --account-name "$COSMOS_NAME" \
-            --resource-group "$RG_NAME" \
-            --role-definition-id "$COSMOS_ROLE_ID" \
-            --principal-id "$BACKEND_PRINCIPAL_ID" \
-            --scope "/" \
+        COSMOS_SCOPE="$(az cosmosdb show --name "$COSMOS_NAME" --resource-group "$RG_NAME" --query id -o tsv)"
+        az role assignment create \
+            --assignee "$BACKEND_PRINCIPAL_ID" \
+            --role "Cosmos DB Built-in Data Contributor" \
+            --scope "$COSMOS_SCOPE" \
             --output table
 
         STORAGE_SCOPE="$(az storage account show --name "$SA_NAME" --resource-group "$RG_NAME" --query id -o tsv)"

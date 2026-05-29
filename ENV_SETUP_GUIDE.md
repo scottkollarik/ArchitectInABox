@@ -66,12 +66,13 @@ These are **automatically set** by deployment scripts:
 
 ```bash
 # Set by deploy.sh
-VITE_API_URL=https://your-backend.azurecontainerapps.io
+VITE_API_URL=https://your-backend.azurecontainerapps.io/aib/api
 ConnectionStrings__CosmosDB=AccountEndpoint=...
 ConnectionStrings__AzureBlob=DefaultEndpointsProtocol=https...
 
 # Set by setup-entra.sh
-VITE_OAUTH_REDIRECT_URI=https://your-frontend.azurecontainerapps.io/auth/callback
+VITE_OAUTH_REDIRECT_URI=https://your-frontend.azurecontainerapps.io/aib/auth/callback
+VITE_OAUTH_SCOPE=api://your-frontend-app-id/user_impersonation
 ```
 
 ## Missing Variables Check
@@ -82,6 +83,7 @@ VITE_OAUTH_REDIRECT_URI=https://your-frontend.azurecontainerapps.io/auth/callbac
    - `VITE_OAUTH_CLIENT_ID`
    - `VITE_OAUTH_TENANT_ID`
    - `VITE_OAUTH_REDIRECT_URI`
+   - `VITE_OAUTH_SCOPE`
    - `EntraAuth__ClientId`
    - `EntraAuth__TenantId`
 

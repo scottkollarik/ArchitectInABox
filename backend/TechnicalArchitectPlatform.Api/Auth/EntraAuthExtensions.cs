@@ -15,11 +15,18 @@ public static class EntraAuthExtensions
         var tenantId = configuration["EntraAuth:TenantId"] ?? Environment.GetEnvironmentVariable("VITE_OAUTH_TENANT_ID");
         var instance = configuration["EntraAuth:Instance"] ?? "https://login.microsoftonline.com/";
 
-        if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(tenantId))
+        if (string.IsNullOrEmpty(clientId))
         {
             // If no OAuth config, allow anonymous access for development
             Console.WriteLine("⚠️  No Entra ID configuration found. Running in anonymous mode for development.");
             return services;
+        }
+
+        // Use 'common' tenant for multi-tenant support (work + personal MS accounts)
+        if (string.IsNullOrEmpty(tenantId) || tenantId == "common")
+        {
+            tenantId = "common";
+            Console.WriteLine("🌐 Multi-tenant mode: Accepting any Microsoft account (work or personal)");
         }
 
         // Configure JWT Bearer authentication with Microsoft Identity
@@ -27,13 +34,27 @@ public static class EntraAuthExtensions
             .AddMicrosoftIdentityWebApi(jwtOptions =>
             {
                 // Configure token validation
+                var validAudiences = new List<string>();
+                if (!string.IsNullOrWhiteSpace(clientId))
+                {
+                    validAudiences.Add(clientId);
+                    validAudiences.Add($"api://{clientId}");
+                }
+
+                var appIdUri = configuration["EntraAuth:Audience"] ?? configuration["EntraAuth:ApplicationIdUri"];
+                if (!string.IsNullOrWhiteSpace(appIdUri))
+                {
+                    validAudiences.Add(appIdUri);
+                }
+
                 jwtOptions.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
                     ValidateAudience = true,
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
-                    ClockSkew = TimeSpan.FromMinutes(5)
+                    ClockSkew = TimeSpan.FromMinutes(5),
+                    ValidAudiences = validAudiences.Distinct(StringComparer.OrdinalIgnoreCase)
                 };
 
                 // Handle authentication events

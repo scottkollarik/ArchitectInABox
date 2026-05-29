@@ -299,6 +299,39 @@ const NFRAssessmentForm: React.FC = () => {
 
   const checkCompoundCompletion = useCallback((question: NFRQuestion, value: any) => {
     if (!question.compoundFields) return false
+
+    if (question.id === 'scale-baseline') {
+      const v = value || {}
+      const hasAnyInput = ['min-instances', 'max-instances', 'scale-signal', 'scale-threshold']
+        .some((key) => typeof v[key] === 'string' && v[key]?.toString().trim() !== '')
+      if (!hasAnyInput) return false
+
+      const minOk = typeof v['min-instances'] === 'string' && v['min-instances'].trim() !== ''
+      const maxOk = typeof v['max-instances'] === 'string' && v['max-instances'].trim() !== ''
+      const signal = typeof v['scale-signal'] === 'string' ? v['scale-signal'] : ''
+      const thresholdRaw = typeof v['scale-threshold'] === 'string' ? v['scale-threshold'] : ''
+      if (!minOk || !maxOk || !signal) return false
+
+      if (!thresholdRaw) return false
+
+      if (signal === 'Custom') {
+        const unitRaw = typeof v['scale-threshold-unit'] === 'string' ? v['scale-threshold-unit'] : ''
+        return unitRaw.trim() !== ''
+      }
+
+      if (signal === 'CPU %' || signal === 'Memory %') {
+        const numeric = Number(thresholdRaw)
+        return !Number.isNaN(numeric) && numeric > 0 && numeric <= 100
+      }
+
+      if (signal === 'Queue length' || signal === 'Requests in flight') {
+        const numeric = Number(thresholdRaw)
+        return !Number.isNaN(numeric) && numeric >= 0
+      }
+
+      return true
+    }
+
     return question.compoundFields.every(field => 
       value && value[field.id] && value[field.id] !== ''
     )
@@ -1224,6 +1257,155 @@ const NFRAssessmentForm: React.FC = () => {
             </div>
           )
         }
+        if (question.id === 'scale-baseline') {
+          const value = question.value || {}
+          const signal: string = typeof value['scale-signal'] === 'string' ? value['scale-signal'] : ''
+          const threshold = typeof value['scale-threshold'] === 'string' ? value['scale-threshold'] : ''
+          const customUnit = typeof value['scale-threshold-unit'] === 'string' ? value['scale-threshold-unit'] : ''
+
+          const unitLabelMap: Record<string, string> = {
+            'CPU %': '%',
+            'Memory %': '%',
+            'Queue length': 'messages',
+            'Requests in flight': 'requests'
+          }
+          const unitLabel = unitLabelMap[signal]
+          const percentSignal = signal === 'CPU %' || signal === 'Memory %'
+          const integerSignal = signal === 'Queue length' || signal === 'Requests in flight'
+
+          const sanitizeThreshold = (raw: string) => {
+            if (raw === '') return ''
+            if (percentSignal) {
+              const cleaned = raw.replace(/[^\d.]/g, '')
+              if (!cleaned) return ''
+              const numeric = Number(cleaned)
+              if (Number.isNaN(numeric)) return cleaned
+              if (numeric > 100) return '100'
+              return cleaned
+            }
+            if (integerSignal) {
+              const cleaned = raw.replace(/[^\d]/g, '')
+              return cleaned
+            }
+            return raw
+          }
+
+          const handleSignalChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+            const nextSignal = e.target.value
+            updateCompoundField(sectionId, question.id, 'scale-signal', nextSignal)
+            if (threshold) updateCompoundField(sectionId, question.id, 'scale-threshold', '')
+            if (customUnit) updateCompoundField(sectionId, question.id, 'scale-threshold-unit', '')
+          }
+
+          const handleThresholdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+            const next = sanitizeThreshold(e.target.value)
+            updateCompoundField(sectionId, question.id, 'scale-threshold', next)
+          }
+
+          const handleThresholdBlur = () => {
+            if (!threshold) return
+            if (percentSignal) {
+              let numeric = Number(threshold)
+              if (Number.isNaN(numeric) || numeric <= 0) {
+                updateCompoundField(sectionId, question.id, 'scale-threshold', '')
+                return
+              }
+              if (numeric > 100) {
+                updateCompoundField(sectionId, question.id, 'scale-threshold', '100')
+              }
+            }
+          }
+
+          const thresholdDisabled = !signal
+
+          return (
+            <div className="mt-1">
+              <div className="flex flex-wrap gap-3">
+                {question.compoundFields?.filter((field) => field.id !== 'scale-threshold').map((field) => {
+                  const fieldValue = value[field.id] || ''
+                  const fieldInputId = `${inputId}-${field.id}`
+                  const widthClasses: Record<string, string> = {
+                    'min-instances': 'max-w-[7.25rem]',
+                    'max-instances': 'max-w-[8.75rem]',
+                    'scale-signal': 'max-w-[10rem]'
+                  }
+                  const minWidthClasses: Record<string, string> = {
+                    'min-instances': 'min-w-[6.5rem]',
+                    'max-instances': 'min-w-[7.5rem]',
+                    'scale-signal': 'min-w-[8.5rem]'
+                  }
+                  const widthClass = widthClasses[field.id] || 'max-w-[10rem]'
+                  const minWidthClass = minWidthClasses[field.id] || 'min-w-[7rem]'
+                  return (
+                    <div key={field.id} className={`${widthClass} ${minWidthClass} flex-shrink-0`}>
+                      <label htmlFor={fieldInputId} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap">
+                        {field.label}
+                      </label>
+                      {field.type === 'select' ? (
+                        <select
+                          id={fieldInputId}
+                          value={fieldValue}
+                          onChange={handleSignalChange}
+                          className="block w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm"
+                        >
+                          <option value="">Select...</option>
+                          {field.options?.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          id={fieldInputId}
+                          type="text"
+                          value={fieldValue}
+                          onChange={(e) => updateCompoundField(sectionId, question.id, field.id, e.target.value)}
+                          className="block w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm"
+                          placeholder={field.placeholder}
+                        />
+                      )}
+                    </div>
+                  )
+                })}
+
+                <div className="flex-shrink-0 min-w-[10rem] max-w-[12rem]">
+                  <label htmlFor={`${inputId}-scale-threshold`} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Target threshold {unitLabel ? <span className="text-gray-500 dark:text-gray-400">({unitLabel})</span> : null}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id={`${inputId}-scale-threshold`}
+                      type="text"
+                      value={threshold}
+                      onChange={handleThresholdChange}
+                      onBlur={handleThresholdBlur}
+                      disabled={thresholdDisabled}
+                      placeholder={signal ? (percentSignal ? '70' : integerSignal ? '200' : 'Enter value') : 'Select a signal first'}
+                      className={`flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500 text-sm ${thresholdDisabled ? 'bg-gray-100 dark:bg-gray-800/40 text-gray-500 dark:text-gray-400 cursor-not-allowed' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'}`}
+                    />
+                    {signal === 'Custom' ? (
+                      <input
+                        id={`${inputId}-scale-threshold-unit`}
+                        type="text"
+                        value={customUnit}
+                        onChange={(e) => updateCompoundField(sectionId, question.id, 'scale-threshold-unit', e.target.value)}
+                        placeholder="Unit"
+                        className="w-28 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-azure-blue-500 focus:border-azure-blue-500"
+                      />
+                    ) : unitLabel ? (
+                      <span className="px-2 py-1.5 text-xs font-medium rounded-md bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700">
+                        {unitLabel}
+                      </span>
+                    ) : null}
+                  </div>
+                  {percentSignal && threshold && (Number(threshold) <= 0 || Number(threshold) > 100) && (
+                    <p className="mt-1 text-xs text-red-500">Enter a value between 1 and 100.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        }
+
         // Default compound layout
         return (
           <div className="mt-1">

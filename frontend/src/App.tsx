@@ -1,7 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
+import { lazy, Suspense } from 'react'
 import { ProjectProvider } from './context/ProjectContext'
+import { POCProvider } from './modules/poc/context/POCContext'
 import { ThemeProvider } from './hooks/useTheme'
 import Layout from './components/Layout'
 import CloudArchitecturePage from './modules/cloud-architecture/pages/CloudArchitecturePage'
@@ -13,14 +15,34 @@ import AIDevelopmentPage from './modules/ai-development/pages/AIDevelopmentPage'
 import ProtectedRoute from './auth/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import AuthCallback from './auth/AuthCallback'
+import OnboardingModal from './components/OnboardingModal'
+import { useUser } from './hooks/useUser'
+import { useAuth } from './auth/EntraAuthProvider'
 
-const ProtectedAppShell = () => (
-  <ProtectedRoute>
-    <Layout>
-      <Outlet />
-    </Layout>
-  </ProtectedRoute>
-)
+// Lazy-load POC pages
+const POCIndex = lazy(() => import('./modules/poc/pages/POCIndex'))
+const DrawerVariantsPOC = lazy(() => import('./modules/poc/pages/DrawerVariantsPOC'))
+
+const ProtectedAppShell = () => {
+  const { user, completeOnboarding } = useUser()
+  const { isAuthenticated } = useAuth()
+
+  const showOnboarding = isAuthenticated && user && !user.hasCompletedOnboarding
+
+  return (
+    <ProtectedRoute>
+      {showOnboarding && (
+        <OnboardingModal
+          userName={user.name || 'there'}
+          onComplete={completeOnboarding}
+        />
+      )}
+      <Layout>
+        <Outlet />
+      </Layout>
+    </ProtectedRoute>
+  )
+}
 
 function App() {
   const basename = import.meta.env.VITE_BASE_PATH || '/'
@@ -41,6 +63,18 @@ function App() {
                 <Route path="/frontend-development" element={<FrontendDevelopmentPage />} />
                 <Route path="/system-integration" element={<SystemIntegrationPage />} />
                 <Route path="/ai-development" element={<AIDevelopmentPage />} />
+              </Route>
+
+              {/* POC Routes - wrapped in POCProvider */}
+              <Route path="/poc" element={
+                <POCProvider>
+                  <Suspense fallback={<div className="p-8 text-center">Loading POC...</div>}>
+                    <Outlet />
+                  </Suspense>
+                </POCProvider>
+              }>
+                <Route index element={<POCIndex />} />
+                <Route path="drawer-variants/:variant" element={<DrawerVariantsPOC />} />
               </Route>
             </Routes>
           </Router>

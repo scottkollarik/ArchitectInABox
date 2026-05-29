@@ -1,11 +1,18 @@
 using MongoDB.Driver;
 using System.Text.Json;
 using Azure.Storage.Blobs;
+using Microsoft.AspNetCore.Http.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using MongoDB.Bson;
+using MongoDB.Bson.IO;
+using MongoDB.Bson.Serialization;
 using TechnicalArchitectPlatform.Api.Artifacts;
 using TechnicalArchitectPlatform.Api.Models;
 using TechnicalArchitectPlatform.Api.Vector;
 using System.Linq;
 using TechnicalArchitectPlatform.Api.Auth;
+using TechnicalArchitectPlatform.Api.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,9 +47,15 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(
+                  "https://www.technologoo.com",
+                  "https://aib-frontend.yellowriver-26644ae4.eastus.azurecontainerapps.io",
+                  "http://localhost:5173",
+                  "http://localhost:3000"
+              )
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 
@@ -53,13 +66,89 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.WriteIndented = true;
 });
 
+var databaseName = builder.Configuration["Database:Name"] ?? "tapdb";
+var dbBackend = builder.Configuration["Database:Backend"]?.ToLowerInvariant() ?? "mongodb";
+
 // Configure MongoDB (for future use)
 builder.Services.AddSingleton<IMongoClient>(serviceProvider =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("MongoDB") 
-                          ?? "mongodb://admin:password123@mongodb:27017/technical-architect-db?authSource=admin";
+    var logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("MongoDB");
+    var connectionString =
+        builder.Configuration.GetConnectionString("MongoDB")
+        ?? builder.Configuration.GetConnectionString("CosmosDB")
+        ?? builder.Configuration["ConnectionStrings__MongoDB"]
+        ?? builder.Configuration["ConnectionStrings__CosmosDB"]
+        ?? $"mongodb://admin:password123@mongodb:27017/{databaseName}?authSource=admin";
+
+    var candidates = new List<string>();
+    void AddCandidate(string? cs)
+    {
+        if (string.IsNullOrWhiteSpace(cs)) return;
+        if (!candidates.Contains(cs)) candidates.Add(cs);
+    }
+
+    AddCandidate(connectionString);
+    AddCandidate($"mongodb://admin:password123@localhost:27017/{databaseName}?authSource=admin");
+
+    var extraCandidates = new List<string>();
+    foreach (var cs in candidates.ToList())
+    {
+        if (cs.Contains("@mongodb", StringComparison.OrdinalIgnoreCase))
+        {
+            extraCandidates.Add(cs.Replace("@mongodb", "@localhost", StringComparison.OrdinalIgnoreCase));
+        }
+        if (cs.Contains("//mongodb", StringComparison.OrdinalIgnoreCase))
+        {
+            extraCandidates.Add(cs.Replace("//mongodb", "//localhost", StringComparison.OrdinalIgnoreCase));
+        }
+    }
+    foreach (var candidate in extraCandidates)
+    {
+        AddCandidate(candidate);
+    }
+
+    foreach (var cs in candidates)
+    {
+        try
+        {
+            var client = new MongoClient(cs);
+            client.GetDatabase(databaseName).RunCommand<BsonDocument>(new BsonDocument("ping", 1));
+            if (!string.Equals(cs, connectionString, StringComparison.Ordinal))
+            {
+                logger.LogInformation("MongoDB connection fallback in use: {ConnectionString}", cs);
+            }
+            return client;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to connect to MongoDB using {ConnectionString}", cs);
+        }
+    }
+
+    logger.LogWarning("Using MongoDB connection string without successful ping; database operations may fail.");
     return new MongoClient(connectionString);
 });
+
+// Configure Repository Layer
+
+if (dbBackend == "cosmosdb")
+{
+    builder.Services.AddSingleton<IProjectRepository>(sp =>
+        new TechnicalArchitectPlatform.Api.Repositories.CosmosDbProjectRepository(sp.GetRequiredService<IMongoClient>(), databaseName));
+    builder.Services.AddSingleton<INfrRepository>(sp =>
+        new TechnicalArchitectPlatform.Api.Repositories.CosmosDbNfrRepository(sp.GetRequiredService<IMongoClient>(), databaseName));
+    builder.Services.AddSingleton<IUserRepository>(sp =>
+        new TechnicalArchitectPlatform.Api.Repositories.CosmosDbUserRepository(sp.GetRequiredService<IMongoClient>(), databaseName));
+}
+else
+{
+    builder.Services.AddSingleton<IProjectRepository>(sp =>
+        new TechnicalArchitectPlatform.Api.Repositories.MongoDbProjectRepository(sp.GetRequiredService<IMongoClient>(), databaseName));
+    builder.Services.AddSingleton<INfrRepository>(sp =>
+        new TechnicalArchitectPlatform.Api.Repositories.MongoDbNfrRepository(sp.GetRequiredService<IMongoClient>(), databaseName));
+    builder.Services.AddSingleton<IUserRepository>(sp =>
+        new TechnicalArchitectPlatform.Api.Repositories.MongoDbUserRepository(sp.GetRequiredService<IMongoClient>(), databaseName));
+}
 
 // Configure Artifact Store (Azure Blob in prod, in-memory in dev if no connection)
 var blobConn = builder.Configuration.GetConnectionString("AzureBlob") ?? builder.Configuration["AzureBlob:ConnectionString"];
@@ -82,6 +171,9 @@ if (!string.IsNullOrWhiteSpace(pathBase))
     app.UsePathBase(pathBase);
 }
 
+// CORS must be before authentication
+app.UseCors();
+
 app.UseEntraAuth();
 
 // Configure the HTTP request pipeline
@@ -94,8 +186,6 @@ if (app.Environment.IsDevelopment())
         options.RoutePrefix = "swagger";
     });
 }
-
-app.UseCors();
 
 // Health check endpoint
 app.MapGet("/health", () => 
@@ -119,46 +209,61 @@ if (authEnabled)
     api.RequireAuthorization("RequireAuthenticatedUser");
 }
 
-// Dev user info (simulate OAuth) — reads headers if present, else returns a default dev user
-api.MapGet("/me", (HttpContext ctx) => Results.Ok(ResolveUser(ctx))).AllowAnonymous()
+// Dev/prod user info endpoint - ensures users are recorded in the database
+var meEndpoint = api.MapGet("/me", async (IUserRepository userRepo, HttpContext ctx, CancellationToken ct) =>
+{
+    var userInfo = await GetUserAsync(ctx, userRepo, ct);
+    var userDoc = await userRepo.GetUserByIdAsync(userInfo.Id, ct);
+
+    return Results.Ok(new
+    {
+        userInfo.Id,
+        userInfo.Email,
+        userInfo.Name,
+        userInfo.IsAuthenticated,
+        IsNewUser = userDoc == null,
+        HasCompletedOnboarding = userDoc?.HasCompletedOnboarding ?? false,
+        CreatedAt = userDoc?.CreatedAt,
+        LastSeenAt = userDoc?.LastSeenAt
+    });
+})
 .WithName("GetMe")
-.WithSummary("Get current user (dev)")
-.WithDescription("Development-only user info via headers (X-User-*) or defaults");
+.WithSummary("Get current user")
+.WithDescription("Returns the resolved user identity and records the user in the database");
 
-// Mongo helpers
-IMongoDatabase GetDb(IMongoClient client)
+if (!authEnabled)
 {
-    // Use DB name from connection string or fallback
-    // If DB not specified, default to 'technical-architect-db'
-    return client.GetDatabase("technical-architect-db");
+    meEndpoint.AllowAnonymous();
 }
 
-FilterDefinition<ProjectDocument> BuildAccessFilter(string scope, string id)
+// Complete onboarding endpoint
+var onboardingEndpoint = api.MapPost("/me/complete-onboarding", async (IUserRepository userRepo, HttpContext ctx, CancellationToken ct) =>
 {
-    var ownerFilter = Builders<ProjectDocument>.Filter.And(
-        Builders<ProjectDocument>.Filter.Eq(x => x.OwnerScope, scope),
-        Builders<ProjectDocument>.Filter.Eq(x => x.OwnerId, id)
-    );
-    var collaboratorFilter = Builders<ProjectDocument>.Filter.ElemMatch(x => x.Collaborators,
-        c => c.PrincipalType == scope && c.PrincipalId == id);
-    return Builders<ProjectDocument>.Filter.Or(ownerFilter, collaboratorFilter);
+    var userInfo = await GetUserAsync(ctx, userRepo, ct, trackUser: false);
+    await userRepo.CompleteOnboardingAsync(userInfo.Id, ct);
+    app.Logger.LogInformation("User {UserId} completed onboarding", userInfo.Id);
+    return Results.Ok(new { success = true });
+})
+.WithName("CompleteOnboarding")
+.WithSummary("Mark user onboarding as complete")
+.WithDescription("Called when a user completes the initial onboarding flow");
+
+if (!authEnabled)
+{
+    onboardingEndpoint.AllowAnonymous();
 }
 
-bool HasOwnerAccess(ProjectDocument project, string scope, string id) =>
-    project.OwnerScope == scope && project.OwnerId == id;
-
-bool HasReadAccess(ProjectDocument project, string scope, string id)
-    => HasOwnerAccess(project, scope, id) || (project.Collaborators?.Any(c => c.PrincipalType == scope && c.PrincipalId == id) ?? false);
-
-bool HasWriteAccess(ProjectDocument project, string scope, string id)
-    => HasOwnerAccess(project, scope, id) || (project.Collaborators?.Any(c => c.PrincipalType == scope && c.PrincipalId == id && (c.Role == "owner" || c.Role == "contributor")) ?? false);
-
+// User resolution helper
 UserInfo ResolveUser(HttpContext ctx)
 {
     if (authEnabled && ctx.User.IsAuthenticated())
     {
-        return ctx.User.GetUserInfo();
+        var userInfo = ctx.User.GetUserInfo();
+        app.Logger.LogInformation("Authenticated user: {UserId} ({Email})", userInfo.Id, userInfo.Email);
+        return userInfo;
     }
+
+    app.Logger.LogDebug("No authentication - using dev/fallback user resolution");
 
     var id = ctx.Request.Headers["X-User-Id"].FirstOrDefault()
              ?? ctx.Request.Query["ownerId"].FirstOrDefault()
@@ -172,135 +277,198 @@ UserInfo ResolveUser(HttpContext ctx)
     return new UserInfo(id, email, name, false);
 }
 
-// Projects API (upsert + list/get)
-api.MapGet("/projects", async (IMongoClient client, HttpContext ctx, CancellationToken ct) =>
+async Task<UserInfo> GetUserAsync(HttpContext ctx, IUserRepository userRepo, CancellationToken ct, bool trackUser = true)
 {
-    var db = GetDb(client);
-    var col = db.GetCollection<ProjectDocument>("projects");
     var userInfo = ResolveUser(ctx);
+    if (!trackUser || string.IsNullOrWhiteSpace(userInfo.Id))
+    {
+        return userInfo;
+    }
+
+    try
+    {
+        await userRepo.UpsertUserAsync(userInfo, ct);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Failed to upsert user {UserId} into datastore", userInfo.Id);
+    }
+
+    return userInfo;
+}
+
+// Conversion helpers for DTO <-> Persistence models
+BsonDocument? ToBson(JsonElement? element)
+{
+    if (!element.HasValue) return null;
+    var value = element.Value;
+    if (value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return null;
+    var json = value.GetRawText();
+    return string.IsNullOrWhiteSpace(json) ? null : BsonDocument.Parse(json);
+}
+
+BsonValue ToBsonValue(JsonElement? element)
+{
+    if (!element.HasValue) return BsonNull.Value;
+    var value = element.Value;
+    if (value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return BsonNull.Value;
+    var json = value.GetRawText();
+    return string.IsNullOrWhiteSpace(json) ? BsonNull.Value : BsonSerializer.Deserialize<BsonValue>(json);
+}
+
+// Conversion helpers for DTO <-> Persistence models
+ProjectCollaboratorDocument ToCollaboratorDocument(ProjectCollaborator dto) => new()
+{
+    PrincipalType = dto.PrincipalType,
+    PrincipalId = dto.PrincipalId,
+    Role = dto.Role,
+    AddedAt = dto.AddedAt
+};
+
+// Projects API (upsert + list/get)
+api.MapGet("/projects", async (IProjectRepository projectRepo, IUserRepository userRepo, HttpContext ctx, CancellationToken ct) =>
+{
+    var userInfo = await GetUserAsync(ctx, userRepo, ct);
     const string ownerScope = "user";
-    var ownerId = userInfo.Id;
-    var filter = BuildAccessFilter(ownerScope, ownerId);
-    var list = await col.Find(filter).ToListAsync(ct);
-    return Results.Ok(list);
+    var projects = await projectRepo.GetProjectsByUserAsync(ownerScope, userInfo.Id, ct);
+    return Results.Ok(projects);
 })
 .WithName("ListProjects")
 .WithSummary("List projects by owner")
 .WithDescription("Returns projects visible to the current user");
 
-api.MapGet("/projects/{id}", async (IMongoClient client, HttpContext ctx, string id, CancellationToken ct) =>
+api.MapGet("/projects/{id}", async (IProjectRepository projectRepo, IUserRepository userRepo, HttpContext ctx, string id, CancellationToken ct) =>
 {
-    var db = GetDb(client);
-    var col = db.GetCollection<ProjectDocument>("projects");
-    var doc = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
-    if (doc is null) return Results.NotFound();
-    var userInfo = ResolveUser(ctx);
-    if (!HasReadAccess(doc, "user", userInfo.Id)) return Results.Forbid();
-    return Results.Ok(doc);
+    var project = await projectRepo.GetProjectByIdAsync(id, ct);
+    if (project is null) return Results.NotFound();
+    var userInfo = await GetUserAsync(ctx, userRepo, ct);
+    if (!await projectRepo.HasReadAccessAsync(id, "user", userInfo.Id, ct)) return Results.Forbid();
+    return Results.Ok(project);
 })
 .WithName("GetProject")
 .WithSummary("Get a project by id");
 
-api.MapPost("/projects", async (IMongoClient client, HttpContext ctx, ProjectDocument project, CancellationToken ct) =>
+api.MapPost("/projects", async (IProjectRepository projectRepo, IUserRepository userRepo, HttpContext ctx, ProjectUpsertRequest payload, CancellationToken ct) =>
 {
-    if (string.IsNullOrWhiteSpace(project.Id)) return Results.BadRequest(new { message = "id required" });
-    var db = GetDb(client);
-    var col = db.GetCollection<ProjectDocument>("projects");
-    var userInfo = ResolveUser(ctx);
-    project.OwnerScope = "user";
-    project.OwnerId = userInfo.Id;
-    project.OrgId = project.OrgId;
-    project.Collaborators ??= new();
+    if (payload is null) return Results.BadRequest(new { message = "Invalid project payload" });
+    if (string.IsNullOrWhiteSpace(payload.Id)) return Results.BadRequest(new { message = "id required" });
+    var userInfo = await GetUserAsync(ctx, userRepo, ct);
+    var project = new ProjectDocument
+    {
+        Id = payload.Id!,
+        Name = string.IsNullOrWhiteSpace(payload.Name) ? "Untitled Project" : payload.Name,
+        Description = payload.Description,
+        OrgId = payload.OrgId,
+        Profile = ToBson(payload.Profile),
+        Cloud = ToBson(payload.Cloud),
+        Constraints = ToBson(payload.Constraints),
+        Architecture = ToBson(payload.Architecture),
+        Collaborators = payload.Collaborators?.Select(ToCollaboratorDocument).ToList() ?? new(),
+        SchemaVersion = payload.SchemaVersion <= 0 ? 1 : payload.SchemaVersion,
+        CreatedAt = payload.CreatedAt == default ? DateTime.UtcNow : payload.CreatedAt,
+        LastModified = payload.LastModified == default ? DateTime.UtcNow : payload.LastModified,
+        OwnerScope = "user",
+        OwnerId = userInfo.Id
+    };
     project.Collaborators.RemoveAll(c => c.PrincipalType == "user" && c.PrincipalId == userInfo.Id); // owner implicit
-    project.LastModified = project.LastModified == default ? DateTime.UtcNow : project.LastModified;
-    project.CreatedAt = project.CreatedAt == default ? DateTime.UtcNow : project.CreatedAt;
-    var res = await col.ReplaceOneAsync(x => x.Id == project.Id, project, new ReplaceOptions { IsUpsert = true }, ct);
-    return Results.Ok(project);
+    var result = await projectRepo.UpsertProjectAsync(project, ct);
+    return Results.Ok(result);
 })
 .WithName("UpsertProject")
 .WithSummary("Create or update a project by id");
 
-api.MapPut("/projects/{id}", async (IMongoClient client, HttpContext ctx, string id, ProjectDocument project, CancellationToken ct) =>
+api.MapPut("/projects/{id}", async (IProjectRepository projectRepo, IUserRepository userRepo, HttpContext ctx, string id, ProjectUpsertRequest payload, CancellationToken ct) =>
 {
-    project.Id = id;
-    var db = GetDb(client);
-    var col = db.GetCollection<ProjectDocument>("projects");
-    var existing = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
+    if (payload is null) return Results.BadRequest(new { message = "Invalid project payload" });
+    var existing = await projectRepo.GetProjectByIdAsync(id, ct);
     if (existing is null) return Results.NotFound();
-    var userInfo = ResolveUser(ctx);
-    if (!HasOwnerAccess(existing, "user", userInfo.Id)) return Results.Forbid();
-    project.OwnerScope = existing.OwnerScope;
-    project.OwnerId = existing.OwnerId;
-    project.OrgId = existing.OrgId;
-    project.CreatedAt = existing.CreatedAt;
-    project.Collaborators ??= new();
+    var userInfo = await GetUserAsync(ctx, userRepo, ct);
+    if (!await projectRepo.HasOwnerAccessAsync(id, "user", userInfo.Id, ct)) return Results.Forbid();
+
+    var project = new ProjectDocument
+    {
+        Id = id,
+        OwnerScope = existing.OwnerScope,
+        OwnerId = existing.OwnerId,
+        OrgId = existing.OrgId,
+        Name = string.IsNullOrWhiteSpace(payload.Name) ? existing.Name : payload.Name,
+        Description = payload.Description,
+        Profile = ToBson(payload.Profile),
+        Cloud = ToBson(payload.Cloud),
+        Constraints = ToBson(payload.Constraints),
+        Architecture = ToBson(payload.Architecture),
+        SchemaVersion = payload.SchemaVersion <= 0 ? existing.SchemaVersion : payload.SchemaVersion,
+        CreatedAt = existing.CreatedAt,
+        LastModified = DateTime.UtcNow,
+        Collaborators = payload.Collaborators is not null
+            ? payload.Collaborators.Select(ToCollaboratorDocument).ToList()
+            : new()
+    };
     project.Collaborators.RemoveAll(c => c.PrincipalType == project.OwnerScope && c.PrincipalId == project.OwnerId);
-    project.LastModified = DateTime.UtcNow;
-    var res = await col.ReplaceOneAsync(x => x.Id == id, project, new ReplaceOptions { IsUpsert = true }, ct);
-    return Results.Ok(project);
+    var result = await projectRepo.UpsertProjectAsync(project, ct);
+    return Results.Ok(result);
 })
 .WithName("PutProject")
 .WithSummary("Replace a project by id");
 
 // NFR API (get/put per project)
-api.MapGet("/projects/{projectId}/nfr", async (IMongoClient client, HttpContext ctx, string projectId, CancellationToken ct) =>
+api.MapGet("/projects/{projectId}/nfr", async (IProjectRepository projectRepo, INfrRepository nfrRepo, IUserRepository userRepo, HttpContext ctx, string projectId, CancellationToken ct) =>
 {
-    var db = GetDb(client);
-    var col = db.GetCollection<NfrAssessmentDocument>("nfrAssessments");
-    var projects = db.GetCollection<ProjectDocument>("projects");
-    var project = await projects.Find(x => x.Id == projectId).FirstOrDefaultAsync(ct);
+    var project = await projectRepo.GetProjectByIdAsync(projectId, ct);
     if (project is null) return Results.NotFound();
-    var userInfo = ResolveUser(ctx);
-    if (!HasReadAccess(project, "user", userInfo.Id)) return Results.Forbid();
-    var doc = await col.Find(x => x.ProjectId == projectId).FirstOrDefaultAsync(ct);
-    return doc is null ? Results.NotFound() : Results.Ok(doc);
+    var userInfo = await GetUserAsync(ctx, userRepo, ct);
+    if (!await projectRepo.HasReadAccessAsync(projectId, "user", userInfo.Id, ct)) return Results.Forbid();
+    var nfr = await nfrRepo.GetByProjectIdAsync(projectId, ct);
+    return nfr is null ? Results.NotFound() : Results.Ok(nfr);
 })
 .WithName("GetProjectNfr")
 .WithSummary("Get NFR assessment for a project");
 
-api.MapPut("/projects/{projectId}/nfr", async (IMongoClient client, HttpContext ctx, string projectId, NfrAssessmentDocument body, CancellationToken ct) =>
+api.MapPut("/projects/{projectId}/nfr", async (IProjectRepository projectRepo, INfrRepository nfrRepo, IUserRepository userRepo, HttpContext ctx, string projectId, NfrAssessmentRequest request, CancellationToken ct) =>
 {
-    var db = GetDb(client);
-    var col = db.GetCollection<NfrAssessmentDocument>("nfrAssessments");
-    var projects = db.GetCollection<ProjectDocument>("projects");
-    var project = await projects.Find(x => x.Id == projectId).FirstOrDefaultAsync(ct);
+    var project = await projectRepo.GetProjectByIdAsync(projectId, ct);
     if (project is null) return Results.NotFound();
-    var userInfo = ResolveUser(ctx);
-    if (!HasWriteAccess(project, "user", userInfo.Id)) return Results.Forbid();
-    body.ProjectId = projectId;
-    if (string.IsNullOrWhiteSpace(body.Id)) body.Id = projectId;
-    body.LastModified = DateTime.UtcNow;
-    if (body.CreatedAt == default) body.CreatedAt = DateTime.UtcNow;
-    var res = await col.ReplaceOneAsync(x => x.ProjectId == projectId, body, new ReplaceOptions { IsUpsert = true }, ct);
-    return Results.Ok(body);
+    var userInfo = await GetUserAsync(ctx, userRepo, ct);
+    if (!await projectRepo.HasWriteAccessAsync(projectId, "user", userInfo.Id, ct)) return Results.Forbid();
+
+    // Map DTO to persistence model
+    var document = new NfrAssessmentDocument
+    {
+        Id = string.IsNullOrWhiteSpace(request.Id) ? projectId : request.Id,
+        ProjectId = projectId,
+        Sections = ToBsonValue(request.Sections),
+        CompletionStatus = ToBsonValue(request.CompletionStatus),
+        SchemaVersion = request.SchemaVersion <= 0 ? 1 : request.SchemaVersion,
+        CreatedAt = request.CreatedAt == default ? DateTime.UtcNow : request.CreatedAt,
+        LastModified = DateTime.UtcNow
+    };
+
+    var result = await nfrRepo.UpsertAsync(document, ct);
+    return Results.Ok(result);
 })
 .WithName("PutProjectNfr")
 .WithSummary("Upsert NFR assessment for a project");
 
 // Sharing endpoints
-record ProjectShareRequest(string PrincipalType, string PrincipalId, string Role);
 
-api.MapGet("/projects/{id}/shares", async (IMongoClient client, HttpContext ctx, string id, CancellationToken ct) =>
+api.MapGet("/projects/{id}/shares", async (IProjectRepository projectRepo, IUserRepository userRepo, HttpContext ctx, string id, CancellationToken ct) =>
 {
-    var db = GetDb(client);
-    var col = db.GetCollection<ProjectDocument>("projects");
-    var project = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
+    var project = await projectRepo.GetProjectByIdAsync(id, ct);
     if (project is null) return Results.NotFound();
-    var userInfo = ResolveUser(ctx);
-    if (!HasOwnerAccess(project, "user", userInfo.Id)) return Results.Forbid();
-    return Results.Ok(project.Collaborators ?? new());
+    var userInfo = await GetUserAsync(ctx, userRepo, ct);
+    if (!await projectRepo.HasOwnerAccessAsync(id, "user", userInfo.Id, ct)) return Results.Forbid();
+    var collaborators = await projectRepo.GetCollaboratorsAsync(id, ct);
+    return Results.Ok(collaborators ?? new List<ProjectCollaborator>());
 })
 .WithName("ListProjectShares")
 .WithSummary("List collaborators for a project");
 
-api.MapPost("/projects/{id}/shares", async (IMongoClient client, HttpContext ctx, string id, ProjectShareRequest request, CancellationToken ct) =>
+api.MapPost("/projects/{id}/shares", async (IProjectRepository projectRepo, IUserRepository userRepo, HttpContext ctx, string id, ProjectShareRequest request, CancellationToken ct) =>
 {
-    var db = GetDb(client);
-    var col = db.GetCollection<ProjectDocument>("projects");
-    var project = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
+    var project = await projectRepo.GetProjectByIdAsync(id, ct);
     if (project is null) return Results.NotFound();
-    var userInfo = ResolveUser(ctx);
-    if (!HasOwnerAccess(project, "user", userInfo.Id)) return Results.Forbid();
+    var userInfo = await GetUserAsync(ctx, userRepo, ct);
+    if (!await projectRepo.HasOwnerAccessAsync(id, "user", userInfo.Id, ct)) return Results.Forbid();
 
     if (request.PrincipalType == project.OwnerScope && request.PrincipalId == project.OwnerId)
         return Results.BadRequest(new { message = "Owner already has full access" });
@@ -309,39 +477,46 @@ api.MapPost("/projects/{id}/shares", async (IMongoClient client, HttpContext ctx
     if (!allowedRoles.Contains(request.Role))
         return Results.BadRequest(new { message = "Invalid role" });
 
-    var collaborators = project.Collaborators ?? new();
-    collaborators.RemoveAll(c => c.PrincipalType == request.PrincipalType && c.PrincipalId == request.PrincipalId);
-    collaborators.Add(new ProjectCollaboratorDocument
+    var collaborator = new ProjectCollaboratorDocument
     {
         PrincipalType = request.PrincipalType,
         PrincipalId = request.PrincipalId,
         Role = request.Role,
         AddedAt = DateTime.UtcNow
-    });
-    project.Collaborators = collaborators;
-    project.LastModified = DateTime.UtcNow;
-    await col.ReplaceOneAsync(x => x.Id == id, project, new ReplaceOptions { IsUpsert = true }, ct);
-    return Results.Ok(project.Collaborators);
+    };
+
+    var collaborators = await projectRepo.AddOrUpdateCollaboratorAsync(id, collaborator, ct);
+    return Results.Ok(collaborators);
 })
 .WithName("UpsertProjectShare")
 .WithSummary("Add or update a collaborator on a project");
 
-api.MapDelete("/projects/{id}/shares/{principalId}", async (IMongoClient client, HttpContext ctx, string id, string principalId, CancellationToken ct) =>
+api.MapDelete("/projects/{id}/shares/{principalId}", async (IProjectRepository projectRepo, IUserRepository userRepo, HttpContext ctx, string id, string principalId, CancellationToken ct) =>
 {
-    var db = GetDb(client);
-    var col = db.GetCollection<ProjectDocument>("projects");
-    var project = await col.Find(x => x.Id == id).FirstOrDefaultAsync(ct);
+    var project = await projectRepo.GetProjectByIdAsync(id, ct);
     if (project is null) return Results.NotFound();
-    var userInfo = ResolveUser(ctx);
-    if (!HasOwnerAccess(project, "user", userInfo.Id)) return Results.Forbid();
-    project.Collaborators ??= new();
-    project.Collaborators.RemoveAll(c => c.PrincipalId == principalId);
-    project.LastModified = DateTime.UtcNow;
-    await col.ReplaceOneAsync(x => x.Id == id, project, new ReplaceOptions { IsUpsert = true }, ct);
+    var userInfo = await GetUserAsync(ctx, userRepo, ct);
+    if (!await projectRepo.HasOwnerAccessAsync(id, "user", userInfo.Id, ct)) return Results.Forbid();
+    await projectRepo.RemoveCollaboratorAsync(id, principalId, ct);
     return Results.NoContent();
 })
 .WithName("DeleteProjectShare")
 .WithSummary("Remove a collaborator from a project");
+
+api.MapDelete("/projects/{id}", async (IProjectRepository projectRepo, INfrRepository nfrRepo, IUserRepository userRepo, HttpContext ctx, string id, CancellationToken ct) =>
+{
+    var existing = await projectRepo.GetProjectByIdAsync(id, ct);
+    if (existing is null) return Results.NotFound();
+
+    var userInfo = await GetUserAsync(ctx, userRepo, ct);
+    if (!await projectRepo.HasOwnerAccessAsync(id, "user", userInfo.Id, ct)) return Results.Forbid();
+
+    await projectRepo.DeleteProjectAsync(id, ct);
+    await nfrRepo.DeleteByProjectIdAsync(id, ct);
+    return Results.NoContent();
+})
+.WithName("DeleteProject")
+.WithSummary("Delete a project by id");
 
 // NFR endpoints (stubbed for now)
 api.MapGet("/nfr/questions", () =>

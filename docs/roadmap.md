@@ -19,6 +19,9 @@
 
 ## Backlog
 
+- **Demo project mode for new users**: Auto-load read-only demo project (`__demo__` flag) with fully populated NFRs and architecture to showcase platform capabilities. Include persistent banner with "Create Your First Project" CTA. Demo data not persisted on modification.
+- **Last-viewed project persistence**: Store `lastViewedProjectId` in localStorage; returning users default to last-worked project (fallback: most recently modified, then first in list).
+- **Interactive product tour**: Optional guided tour (Shepherd.js/Intro.js) highlighting NFR assessment, architecture canvas, cost estimates, and project creation flow.
 - Phase 7 CLI alignment (new hostname + certificate commands).
 - Private-network hardening (VNET + private endpoints, disable public network access).
 - Monetization hooks (plan tiers, billing integration, entitlement checks).
@@ -28,10 +31,12 @@
 - Approval workflows for org projects (owner/contributor/reader + sign-off logic).
 - Cost report driven by NFR usage (average vs peak load, scaling breakdowns, licensing callouts).
 - NFR extensions for user counts and Microsoft 365 workload selection (drive Entra/M365 licensing).
+- Add Cosmos SQL repository implementation and config toggle (true SQL API support alongside Mongo-compatible path).
+- Identity provider & auth flows blade with audience presets, provider tiles, and optional advanced flow toggles.
 - Microsoft 365 service add-on catalog (Logic Apps, SPFx, declarative agents, Power Platform connectors).
-- Component-level requirement consoles (“flip” cards) for key services (App Service, VNET, Synapse) with override-aware tuning and template preview.
+- Component-level requirement consoles ("flip" cards) for key services (App Service, VNET, Synapse) with override-aware tuning and template preview.
 - Scoped NFR overrides attached to components/workstreams while inheriting from global baselines.
-- Wireframe “rack back” interaction for visualizing service wiring (dependencies, networking, logging).
+- Wireframe "rack back" interaction for visualizing service wiring (dependencies, networking, logging).
 
 ## Bugs / Known Issues
 - Avatar picker does not persist selection (localStorage update confirmed, but badge not refreshing).
@@ -41,7 +46,7 @@
 - Auto-save lacks visual feedback (needs “Saving…” indicator + last saved timestamp).
 - Phase 7 script assumes legacy CLI flags; manual steps required to add hostname + managed cert.
 
-_Last updated: 2025-09-19_
+_Last updated: 2025-09-30_
 
 ## Implementation Progress
 - Header now shows user badge with fun avatar picker; layout responsive tweaks move project selector below title on mobile.
