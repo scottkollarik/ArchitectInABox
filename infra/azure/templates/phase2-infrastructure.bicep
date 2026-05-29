@@ -123,6 +123,45 @@ resource logsCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/
   }
 }
 
+resource azureServiceCatalogCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections@2023-04-15' = {
+  parent: mongoDb
+  name: 'azureServiceCatalog'
+  properties: {
+    resource: {
+      id: 'azureServiceCatalog'
+      shardKey: {
+        category: 'Hash'
+      }
+    }
+  }
+}
+
+resource nfrRecommendationsCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections@2023-04-15' = {
+  parent: mongoDb
+  name: 'nfrRecommendations'
+  properties: {
+    resource: {
+      id: 'nfrRecommendations'
+      shardKey: {
+        nfrQuestionId: 'Hash'
+      }
+    }
+  }
+}
+
+resource catalogRefreshRunsCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections@2023-04-15' = {
+  parent: mongoDb
+  name: 'catalogRefreshRuns'
+  properties: {
+    resource: {
+      id: 'catalogRefreshRuns'
+      shardKey: {
+        _id: 'Hash'
+      }
+    }
+  }
+}
+
 // Container Apps environment
 resource cae 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: '${namePrefix}-cae'
@@ -211,6 +250,9 @@ resource frontend 'Microsoft.App/containerApps@2023-05-01' = {
     }
   }
 }
+
+// TODO: Add Azure AI Foundry agent resource here for monthly catalog refresh
+// (model-swappable — Foundry project + scheduled agent trigger, not a Container Apps Job)
 
 // Outputs
 output storageAccountName string = sa.name

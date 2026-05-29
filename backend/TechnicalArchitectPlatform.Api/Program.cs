@@ -535,22 +535,82 @@ api.MapPost("/nfr/assessment", (object assessment) =>
 .WithSummary("Save NFR assessment")
 .WithDescription("Saves a completed NFR assessment");
 
-// Architecture endpoints (stubbed for now)
-api.MapGet("/architecture/services", () =>
+// Architecture endpoints
+
+api.MapGet("/architecture/services", async (HttpContext ctx, CancellationToken ct) =>
 {
-    return Results.Ok(new { message = "Azure services catalog endpoint ready" });
+    var mongoClient = ctx.RequestServices.GetRequiredService<IMongoClient>();
+    var db = mongoClient.GetDatabase(databaseName);
+    var collection = db.GetCollection<AzureServiceDocument>("azureServiceCatalog");
+
+    var services = await collection
+        .Find(Builders<AzureServiceDocument>.Filter.Eq(s => s.IsDeprecated, false))
+        .ToListAsync(ct);
+
+    if (services.Count == 0)
+    {
+        return Results.NotFound(new { message = "Catalog not yet populated — run the refresh job" });
+    }
+
+    // Group into { [categoryId]: { id, name, services[] } }
+    // Category id is derived from the category string (lowercased, spaces → hyphens).
+    var grouped = services
+        .GroupBy(s => s.Category)
+        .ToDictionary(
+            g => g.Key.ToLowerInvariant().Replace(' ', '-'),
+            g => new
+            {
+                id = g.Key.ToLowerInvariant().Replace(' ', '-'),
+                name = g.Key,
+                services = g.OrderBy(s => s.Name).ToList()
+            }
+        );
+
+    return Results.Ok(grouped);
 })
 .WithName("GetAzureServices")
 .WithSummary("Get Azure services catalog")
-.WithDescription("Returns the catalog of available Azure services with categories");
+.WithDescription("Returns non-deprecated Azure services grouped by category. Returns 404 if the catalog has not yet been seeded by the refresh job.");
 
-api.MapPost("/architecture/recommend", (object nfrAssessment) =>
+api.MapPost("/architecture/recommend", async (RecommendRequest body, HttpContext ctx, CancellationToken ct) =>
 {
-    return Results.Ok(new { message = "Architecture recommendations generated", input = nfrAssessment });
+    if (body is null)
+        return Results.BadRequest(new { message = "Request body is required" });
+
+    var mongoClient = ctx.RequestServices.GetRequiredService<IMongoClient>();
+    var db = mongoClient.GetDatabase(databaseName);
+    var collection = db.GetCollection<NfrRecommendationRuleDocument>("nfrRecommendations");
+
+    var allRules = await collection.Find(FilterDefinition<NfrRecommendationRuleDocument>.Empty).ToListAsync(ct);
+
+    if (allRules.Count == 0)
+    {
+        return Results.NotFound(new { message = "Recommendations not yet generated — run the refresh job" });
+    }
+
+    // Match rules whose nfrQuestionId appears as a key in the provided nfrAnswers map.
+    var answeredQuestionIds = body.NfrAnswers?.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase)
+                              ?? new HashSet<string>();
+
+    var matchedRules = allRules
+        .Where(r => answeredQuestionIds.Contains(r.NfrQuestionId))
+        .OrderBy(r => r.Priority)
+        .ToList();
+
+    var recommendedServiceIds = matchedRules
+        .SelectMany(r => r.RecommendedServiceIds)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    return Results.Ok(new
+    {
+        recommendedServiceIds,
+        rules = matchedRules
+    });
 })
 .WithName("GenerateRecommendations")
 .WithSummary("Generate architecture recommendations")
-.WithDescription("Generates Azure architecture recommendations based on NFR assessment");
+.WithDescription("Matches NFR answers against recommendation rules and returns a deduplicated list of recommended Azure service IDs with the matched rules.");
 
 api.MapPost("/architecture/pricing", (object architectureConfig) =>
 {
