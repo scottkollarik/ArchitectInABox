@@ -1,4 +1,32 @@
 import React, { useState } from 'react'
+import { CpuChipIcon, BeakerIcon, ShieldCheckIcon, ChartBarIcon } from '@heroicons/react/24/outline'
+
+const roadmapItems = [
+  {
+    icon: CpuChipIcon,
+    title: 'Model Selection Advisor',
+    description: 'Compare Azure OpenAI, Claude, and open-source models based on your latency, cost, and capability requirements.',
+    status: 'Planned',
+  },
+  {
+    icon: BeakerIcon,
+    title: 'Eval & Observability Planner',
+    description: 'Define evaluation strategy, hallucination guardrails, and integrate with Azure AI Studio or LangSmith.',
+    status: 'Planned',
+  },
+  {
+    icon: ShieldCheckIcon,
+    title: 'Safety & Compliance Checklist',
+    description: 'PII detection, content filtering policy, data residency, and responsible AI practices tailored to your NFR profile.',
+    status: 'Planned',
+  },
+  {
+    icon: ChartBarIcon,
+    title: 'Cost & Throughput Estimator',
+    description: 'Model token costs, vector DB sizing, and RAG pipeline infrastructure based on expected request volume.',
+    status: 'Planned',
+  },
+]
 
 const AIDevelopmentPage: React.FC = () => {
   const [showPanel, setShowPanel] = useState(true)
@@ -33,8 +61,32 @@ const AIDevelopmentPage: React.FC = () => {
       </div>
 
       <div className="col-span-12">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-architect-gray-200 dark:border-gray-700 p-6 text-architect-gray-600 dark:text-gray-300 text-sm">
-          AI workspace coming next.
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-architect-gray-200 dark:border-gray-700 p-6">
+          <div className="mb-5">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">AI Workspace</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Tooling to plan, evaluate, and deploy AI components alongside your cloud architecture. Coming in v2.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {roadmapItems.map((item) => {
+              const Icon = item.icon
+              return (
+                <div key={item.title} className="flex gap-4 p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                  <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                    <Icon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">{item.title}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400">{item.status}</span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{item.description}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>

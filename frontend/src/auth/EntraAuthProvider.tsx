@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react'
 import { PublicClientApplication, Configuration, AccountInfo, RedirectRequest, SilentRequest } from '@azure/msal-browser'
 
 const authEnabled = (import.meta.env.VITE_ENABLE_ENTRA_AUTH ?? 'true').toLowerCase() !== 'false'
@@ -59,8 +59,13 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
   const [tenantId, setTenantId] = useState<string | null>(null)
   const [objectId, setObjectId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  // Guard against React StrictMode double-invoke and component remounts
+  const initStarted = useRef(false)
 
   useEffect(() => {
+    if (initStarted.current) return
+    initStarted.current = true
+
     const initialize = async () => {
       if (!authEnabled) {
         setUser(null)

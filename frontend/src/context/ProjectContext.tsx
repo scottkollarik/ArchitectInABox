@@ -34,6 +34,7 @@ interface ProjectContextType {
   currentProject: Project | null
   projects: Project[]
   isLoading: boolean
+  isWarming: boolean
   createProject: (name: string, description: string) => Promise<Project>
   loadProject: (projectId: string) => Promise<void>
   updateProject: (updates: Partial<Project>) => Promise<void>
@@ -75,6 +76,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [isWarming, setIsWarming] = useState<boolean>(false)
   const pendingSyncTimers = useRef<Record<string, number>>({})
   const lastProjectIdRef = useRef<string | null>(null)
   const apiBaseRef = useRef<string>()
@@ -209,6 +211,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     setIsLoading(true)
+    // Show "warming up" banner if the backend takes more than 4s (scale-to-zero cold start)
+    const warmingTimer = window.setTimeout(() => setIsWarming(true), 4000)
     try {
       const list = await fetchJson('/api/projects')
       const mapped = Array.isArray(list) ? await Promise.all(list.map(mapProjectFromApi)) : []
@@ -228,6 +232,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setCurrentProject(null)
       return []
     } finally {
+      window.clearTimeout(warmingTimer)
+      setIsWarming(false)
       setIsLoading(false)
     }
   }, [auth.isAuthEnabled, auth.isAuthenticated, fetchJson, mapProjectFromApi])
@@ -321,6 +327,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       currentProject,
       projects,
       isLoading,
+      isWarming,
       createProject,
       loadProject,
       updateProject,

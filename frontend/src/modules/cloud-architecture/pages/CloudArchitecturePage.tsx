@@ -8,7 +8,7 @@ import { getSectionCompletion, nfrSections } from '../data/nfrData'
 import type { NFRSection } from '../types'
 import { generateRecommendations, getServiceById, getAllServices } from '../data/azureServices'
 import { estimateMonthlyCost } from '../utils/costEstimator'
-import { ChevronDownIcon, ChevronRightIcon, CurrencyDollarIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { ChevronDownIcon, ChevronRightIcon, CurrencyDollarIcon, FolderPlusIcon, PlusIcon } from '@heroicons/react/24/outline'
 import AlignmentReportDrawer from '../components/AlignmentReportDrawer'
 
 const CloudArchitecturePage: React.FC = () => {
@@ -18,7 +18,8 @@ const CloudArchitecturePage: React.FC = () => {
   const [messages, setMessages] = useState<{ id: string; message: string; type: 'info' | 'warning' | 'success' }[]>([])
   const [showReport, setShowReport] = useState(false)
   const location = useLocation()
-  const { currentProject } = useProject()
+  const { currentProject, isLoading, createProject } = useProject()
+  const [creatingDemo, setCreatingDemo] = useState(false)
 
   const sections: NFRSection[] = useMemo(() => {
     return (currentProject?.nfrAssessment as NFRSection[] | undefined) || nfrSections
@@ -214,6 +215,39 @@ const CloudArchitecturePage: React.FC = () => {
     window.addEventListener('alignment-report-open', handler)
     return () => window.removeEventListener('alignment-report-open', handler)
   }, [])
+
+  if (!isLoading && !currentProject) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-10 max-w-md w-full">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-full mb-5">
+            <FolderPlusIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No project selected</h2>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+            Create a project to start planning your cloud architecture, completing NFR assessments, and building your Azure service stack.
+          </p>
+          <button
+            onClick={async () => {
+              setCreatingDemo(true)
+              try {
+                await createProject('My First Architecture', 'Cloud architecture planning project')
+              } finally {
+                setCreatingDemo(false)
+              }
+            }}
+            disabled={creatingDemo}
+            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition disabled:opacity-50"
+          >
+            {creatingDemo ? 'Creating…' : 'Create your first project'}
+          </button>
+          <p className="mt-4 text-xs text-gray-400 dark:text-gray-500">
+            Or use the project selector in the top bar to open an existing project.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="grid grid-cols-12 gap-6">

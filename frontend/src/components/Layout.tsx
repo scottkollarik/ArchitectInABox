@@ -1,15 +1,16 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { 
-  CloudIcon, 
-  CodeBracketIcon, 
-  DevicePhoneMobileIcon, 
-  Cog6ToothIcon, 
+import {
+  CloudIcon,
+  CodeBracketIcon,
+  DevicePhoneMobileIcon,
+  Cog6ToothIcon,
   CpuChipIcon,
   CircleStackIcon
 } from '@heroicons/react/24/outline'
 import ProjectHeader from './ProjectHeader'
 import UserBadge from './UserBadge'
+import { useProject } from '../context/ProjectContext'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -17,6 +18,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation()
+  const { isWarming } = useProject()
 
   const navigationItems = [
     { path: '/cloud-architecture', name: 'Cloud Architecture', icon: CloudIcon },
@@ -99,6 +101,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </nav>
 
       {/* Project Header moved into top header */}
+
+      {/* Cold-start warming banner */}
+      {isWarming && (
+        <div className="bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-700 px-4 py-2 flex items-center gap-3 text-sm text-amber-800 dark:text-amber-200">
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-amber-500 border-t-transparent flex-shrink-0" />
+          <span>Backend is warming up — this takes about 20 seconds on first load. Hang tight…</span>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="container mx-auto px-4 pt-0 pb-6 dark:text-white transition-colors">
