@@ -8,6 +8,7 @@ WORKDIR /app
 # Copy solution and project files
 COPY *.sln .
 COPY TechnicalArchitectPlatform.Api/*.csproj ./TechnicalArchitectPlatform.Api/
+COPY TechnicalArchitectPlatform.CatalogRefresh/*.csproj ./TechnicalArchitectPlatform.CatalogRefresh/
 
 # Restore packages
 RUN dotnet restore
