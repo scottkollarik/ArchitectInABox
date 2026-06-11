@@ -1,7 +1,7 @@
 # Production build image for the frontend
 # Build with: docker buildx build --platform linux/amd64 -f frontend/Dockerfile -t <image> ./frontend
 
-FROM node:18-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
