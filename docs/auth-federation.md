@@ -1,7 +1,27 @@
 # Auth Federation — Design Note
 
-**Status:** Approved direction, infra deferred · **Date:** 2026-06-16
+**Status:** External tenant **provisioned** 2026-06-16; app registrations + providers next.
 **Decision:** Use **Microsoft Entra External ID** as the single token issuer for all federated identity providers.
+
+## Provisioned tenant (2026-06-16)
+
+| | |
+|---|---|
+| Domain | `technologooext.onmicrosoft.com` (sign-in `technologooext.ciamlogin.com`) |
+| Tenant ID | `a75b54b6-37ac-4b63-92fb-78fd35e1abe5` |
+| Region | United States · Billing **MAU** (free tier) |
+| ARM resource | `Microsoft.AzureActiveDirectory/ciamDirectories` in `rg-shared-services-free` (SKU `Base`/`A0`) |
+| Strategy | **Consolidated brand tenant** — each product is its own app registration; AIB is the first. |
+
+**Multi-product decision:** one brand tenant, products = separate app registrations (own clientId,
+redirect URIs, scopes, branding). Rationale: cross-product SSO, one MAU pool (a user active in N
+products = 1 MAU), central provider/policy config.
+
+**Reversibility (why consolidated is safe to start with):** splitting one product's users out later
+is a *bounded* migration — identify the population via the app registration's sign-in logs, recreate
+in a new tenant keyed by **email**, social users re-consent (clean), local-account passwords reset
+(no hash export). Splitting OUT is the easier direction; merging separate tenants back together is
+worse. Keeping email required + per-app registration = "designed for divestiture".
 
 ---
 
@@ -39,6 +59,20 @@ doc is a projection created/refreshed JIT and is the authorization/profile sourc
 - Identity resolution now **fails closed** outside Development (`UserIdentityPolicy`).
 - JIT upsert already happens in `GetUserAsync` → `UpsertUserAsync`.
 
+## Where it lives (provisioning facts)
+
+- The **external tenant** is a **separate Entra directory** — its own tenant ID, administered by
+  switching directories in the portal / `*.ciamlogin.com`. It is **not** "inside" an RG the way a
+  Container App is.
+- The Azure **billing/link resource** is `Microsoft.AzureActiveDirectory/ciamDirectories`. That
+  object goes in a normal RG — we'll use **`rg-shared-services-free`** (alongside APIM, vector
+  Cosmos, Key Vault, etc.). None exists yet (checked 2026-06-16).
+- **Region / data residency = United States**, chosen at creation and effectively permanent.
+- **App registrations** (SPA + API) are created **inside the external tenant**, not the current
+  workforce tenant.
+- **Cost:** free at our scale via the **MAU-based free tier (~50k MAU)**. The RG name is
+  organizational only and does not enforce free-ness.
+
 ## Migration steps (when we pick up infra)
 
 1. **Provision** a free Entra External ID *external tenant* (confirm none exists first).
@@ -52,6 +86,17 @@ doc is a projection created/refreshed JIT and is the authorization/profile sourc
    support is **optional** (testing convenience only) — see Cutover. Update `EntraAuthExtensions`.
 6. **JIT verification:** confirm first sign-in upserts the user doc with claims from the new
    issuer; map provider-specific claim shapes (e.g., Google `email`/`name`) to `UserInfo`.
+
+### Customer-facing naming (NOT the directory display name)
+
+- The tenant **directory display name** (`Technologoo (External ID)`) is **admin/portal only** and
+  **read-only after creation** (Graph `organization.displayName` rejects PATCH). The `(External ID)`
+  suffix only helps admins tell tenants apart; customers never need to see it.
+- What **customers** see is driven by:
+  - **Company Branding** (`/organization/{id}/branding`) — sign-in page logo/background **and** the
+    org identity in OTP/verification emails. Currently **unconfigured** (default). Set this to a
+    friendly **"Technologoo"** + logo as part of app setup.
+  - **App registration name** (e.g., `Architect-in-a-Box`) — shown on the **consent** screen per product.
 
 ### Required attributes — email is mandatory
 
