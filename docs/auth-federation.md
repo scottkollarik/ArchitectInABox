@@ -48,10 +48,32 @@ doc is a projection created/refreshed JIT and is the authorization/profile sourc
    Microsoft accounts still flow through.
 4. **Frontend:** env-driven *parallel* MSAL config (new authority/client ID) so we can test
    External ID without breaking the current Entra login. Toggle via build args.
-5. **API token validation:** accept the External ID issuer + audience. Support **both** issuers
-   during migration (additive), then drop the old one. Update `EntraAuthExtensions`.
+5. **API token validation:** point validation at the External ID issuer + audience. Dual-issuer
+   support is **optional** (testing convenience only) — see Cutover. Update `EntraAuthExtensions`.
 6. **JIT verification:** confirm first sign-in upserts the user doc with claims from the new
    issuer; map provider-specific claim shapes (e.g., Google `email`/`name`) to `UserInfo`.
+
+### Required attributes — email is mandatory
+
+`oid` is the canonical identity key, but **`email` is a required emitted claim** (for display,
+notifications, support lookups, and a human-readable handle). This drives config:
+- In the External ID **user flow**, mark email as a collected + emitted attribute.
+- For each social provider, request the email scope (Google: `email`) so the claim is actually present.
+- In prod, treat a token **without** an email claim as a misconfiguration → deny, do **not**
+  synthesize a placeholder. (The current dev fallback's `{id}@example.com` synthesis must never
+  run under External ID — it only exists for local development, already gated by `UserIdentityPolicy`.)
+
+## Cutover — zero-state clean break (decided 2026-06-16)
+
+There are **no real users yet**, so we skip all identity migration:
+- No `oid` re-keying, no email-linking, no dual-key reconciliation. Everyone (Scott included)
+  re-authenticates fresh under External ID on first access; the JIT upsert creates the user doc
+  with the External ID `oid` as the canonical key from day one.
+- Because of this, the API can **hard-cut** to the single External ID issuer; dual-issuer is only
+  worth wiring if we want to test both side-by-side before flipping prod.
+- **Cleanup caveat:** a clean break orphans any existing project/ACL records keyed to old
+  workforce `oid`s (e.g., throwaway test projects). At cutover either wipe the `users` and
+  `projects` collections for a true zero-state, or accept the harmless orphans.
 
 ## Testing plan
 
@@ -60,6 +82,7 @@ doc is a projection created/refreshed JIT and is the authorization/profile sourc
 - Integration: end-to-end sign-in per provider → `/me` returns correct identity →
   user doc JIT-created exactly once.
 - Negative: token from old issuer rejected once migration completes; tampered/expired token → 401.
+- Negative: token missing the `email` claim is rejected (no placeholder synthesis in prod).
 
 ## Open questions
 
