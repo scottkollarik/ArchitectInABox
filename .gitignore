@@ -125,6 +125,10 @@ storybook-static
 !.vscode/extensions.json
 *.code-workspace
 
+# Claude Code - share project config, ignore personal/local files
+.claude/*
+!.claude/settings.json
+
 # IDE - IntelliJ
 .idea/
 *.iws

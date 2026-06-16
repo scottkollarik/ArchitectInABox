@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(az containerapp logs *)",
+      "Bash(az containerapp show *)",
+      "Bash(az containerapp revision *)",
+      "Bash(az containerapp list *)",
+      "Bash(dotnet list package *)"
+    ]
+  }
+}
