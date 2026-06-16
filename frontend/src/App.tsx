@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { ProjectProvider } from './context/ProjectContext'
 import { POCProvider } from './modules/poc/context/POCContext'
 import { ThemeProvider } from './hooks/useTheme'
@@ -23,18 +23,42 @@ import { useAuth } from './auth/EntraAuthProvider'
 const POCIndex = lazy(() => import('./modules/poc/pages/POCIndex'))
 const DrawerVariantsPOC = lazy(() => import('./modules/poc/pages/DrawerVariantsPOC'))
 
+// Local fallback so the onboarding wizard can never trap a user even if the
+// backend completion call fails (e.g. cold-start timeout or a missing route).
+// Keyed per-user so a different account on the same browser still sees onboarding.
+const onboardedKey = (userId: string) => `aib_onboarded_${userId}`
+
 const ProtectedAppShell = () => {
   const { user, completeOnboarding } = useUser()
   const { isAuthenticated } = useAuth()
+  const [locallyDismissed, setLocallyDismissed] = useState(false)
 
-  const showOnboarding = isAuthenticated && user && !user.hasCompletedOnboarding
+  const dismissedInStorage =
+    !!user && localStorage.getItem(onboardedKey(user.id)) === 'true'
+
+  const showOnboarding =
+    isAuthenticated && !!user && !user.hasCompletedOnboarding &&
+    !dismissedInStorage && !locallyDismissed
+
+  // Best-effort server record, but always dismiss locally so the demo flow
+  // is never blocked. The underlying error is still surfaced to the console.
+  const handleOnboardingComplete = async () => {
+    try {
+      await completeOnboarding()
+    } catch (err) {
+      console.error('Onboarding completion did not persist server-side; dismissing locally', err)
+    } finally {
+      if (user) localStorage.setItem(onboardedKey(user.id), 'true')
+      setLocallyDismissed(true)
+    }
+  }
 
   return (
     <ProtectedRoute>
-      {showOnboarding && (
+      {showOnboarding && user && (
         <OnboardingModal
           userName={user.name || 'there'}
-          onComplete={completeOnboarding}
+          onComplete={handleOnboardingComplete}
         />
       )}
       <Layout>
