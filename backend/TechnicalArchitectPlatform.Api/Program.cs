@@ -171,6 +171,20 @@ if (!string.IsNullOrWhiteSpace(pathBase))
     app.UsePathBase(pathBase);
 }
 
+// Fail closed: turn identity-policy refusals into a clean 401 rather than a 500.
+app.Use(async (ctx, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (IdentityRequiredException)
+    {
+        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        await ctx.Response.WriteAsJsonAsync(new { error = "Authentication required" });
+    }
+});
+
 // CORS must be before authentication
 app.UseCors();
 
@@ -256,11 +270,25 @@ if (!authEnabled)
 // User resolution helper
 UserInfo ResolveUser(HttpContext ctx)
 {
-    if (authEnabled && ctx.User.IsAuthenticated())
+    var source = UserIdentityPolicy.DecideSource(
+        authEnabled,
+        ctx.User.IsAuthenticated(),
+        app.Environment.IsDevelopment());
+
+    if (source == IdentitySource.Token)
     {
         var userInfo = ctx.User.GetUserInfo();
         app.Logger.LogInformation("Authenticated user: {UserId} ({Email})", userInfo.Id, userInfo.Email);
         return userInfo;
+    }
+
+    if (source == IdentitySource.Denied)
+    {
+        // Fail closed: header/query identity is spoofable and only honored in
+        // development. Outside development we never trust it, even if the auth
+        // flag is misconfigured. Mapped to HTTP 401 by middleware below.
+        app.Logger.LogWarning("Refusing header-based identity outside development (authEnabled={AuthEnabled})", authEnabled);
+        throw new IdentityRequiredException("Authenticated identity required.");
     }
 
     app.Logger.LogDebug("No authentication - using dev/fallback user resolution");
