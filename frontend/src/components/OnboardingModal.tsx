@@ -20,7 +20,7 @@ export default function OnboardingModal({ userName, onComplete }: OnboardingModa
             Hi <span className="font-semibold">{userName}</span>! 👋
           </p>
           <p className="text-gray-600 dark:text-gray-300">
-            You're about to design enterprise-grade cloud architectures with AI-powered guidance.
+            You&apos;re about to design enterprise-grade cloud architectures with AI-powered guidance.
           </p>
           <div className="space-y-3 mt-6">
             <div className="flex items-start gap-3">
@@ -65,7 +65,7 @@ export default function OnboardingModal({ userName, onComplete }: OnboardingModa
       content: (
         <div className="space-y-4">
           <p className="text-gray-600 dark:text-gray-300">
-            Here's what you'll find in the platform:
+            Here&apos;s what you&apos;ll find in the platform:
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">

@@ -391,7 +391,7 @@ const ProjectHeader: React.FC<{ compact?: boolean }> = ({ compact = false }) => 
                   onClick={handleCreateProject}
                   disabled={isCreatingProject || !newProjectName.trim()}
                   aria-busy={isCreatingProject}
-                  className={`flex-1 px-4 py-2 rounded-md text-white transition-transform transition-colors duration-150 ${
+                  className={`flex-1 px-4 py-2 rounded-md text-white transition-all duration-150 ${
                     isCreatingProject
                       ? 'bg-azure-blue-500 opacity-80 cursor-wait'
                       : 'bg-azure-blue-600 hover:bg-azure-blue-700 active:translate-y-[1px]'

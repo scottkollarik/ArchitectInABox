@@ -30,6 +30,10 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 # Copy published application
 COPY --from=build /app/out .
 
+# Run as non-root for security best practice
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+USER appuser
+
 # Expose port
 EXPOSE 5000
 

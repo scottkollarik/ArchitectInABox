@@ -1305,7 +1305,7 @@ const NFRAssessmentForm: React.FC = () => {
           const handleThresholdBlur = () => {
             if (!threshold) return
             if (percentSignal) {
-              let numeric = Number(threshold)
+              const numeric = Number(threshold)
               if (Number.isNaN(numeric) || numeric <= 0) {
                 updateCompoundField(sectionId, question.id, 'scale-threshold', '')
                 return
