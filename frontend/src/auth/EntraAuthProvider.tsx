@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react'
-import { PublicClientApplication, Configuration, AccountInfo, RedirectRequest, SilentRequest } from '@azure/msal-browser'
+import { PublicClientApplication, Configuration, AccountInfo, RedirectRequest, SilentRequest, InteractionRequiredAuthError } from '@azure/msal-browser'
+
+// Module-level guard so concurrent API calls (each calling getAccessToken)
+// don't each fire an interactive redirect.
+let interactiveTokenInProgress = false
 
 const authEnabled = (import.meta.env.VITE_ENABLE_ENTRA_AUTH ?? 'true').toLowerCase() !== 'false'
 
@@ -179,12 +183,28 @@ export const EntraAuthProvider: React.FC<EntraAuthProviderProps> = ({ children }
     }
 
     try {
-     const response = await msalInstance.acquireTokenSilent(silentRequest)
-     return response.accessToken
+      const response = await msalInstance.acquireTokenSilent(silentRequest)
+      return response.accessToken
     } catch (error) {
+      // Refresh token expired or consent required → silent acquisition fails.
+      // Recover by re-authenticating interactively. Returning null here (the old
+      // behavior) left the app logged-in-but-tokenless, so every API call 401'd
+      // silently (empty projects, dead "Create Project" button, etc.).
+      if (error instanceof InteractionRequiredAuthError) {
+        if (!interactiveTokenInProgress && msalInstance) {
+          interactiveTokenInProgress = true
+          try {
+            // Full-page redirect to re-auth; on return, cached token is fresh.
+            await msalInstance.acquireTokenRedirect({ scopes: apiOnlyScopes, account: user })
+          } catch (redirectError) {
+            interactiveTokenInProgress = false
+            console.error('Interactive token acquisition failed:', redirectError)
+          }
+        }
+        // The page is navigating away for re-auth; no token to return this call.
+        return null
+      }
       console.error('Silent token acquisition failed:', error)
-      // acquireTokenRedirect will redirect the page, so we can't return a token
-      // Just return null and let the calling code handle the missing token
       return null
     }
   }
