@@ -26,6 +26,10 @@ const msalConfig: Configuration = {
     authority: `https://login.microsoftonline.com/${import.meta.env.VITE_OAUTH_TENANT_ID || 'common'}`,
     redirectUri: import.meta.env.VITE_OAUTH_REDIRECT_URI || withBasePath('/auth/callback'),
     postLogoutRedirectUri: normalizedBasePath ? `${window.location.origin}${normalizedBasePath}/` : `${window.location.origin}/`,
+    // We use a dedicated /auth/callback route that navigates via returnUrl itself.
+    // Leaving this true (the default) makes MSAL ALSO navigate to the login-request
+    // URL, and the two competing navigations cause a post-consent redirect loop.
+    navigateToLoginRequestUrl: false,
   },
   cache: {
     cacheLocation: 'localStorage',
