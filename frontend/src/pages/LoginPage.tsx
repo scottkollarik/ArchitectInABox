@@ -1,6 +1,6 @@
 import React from 'react'
 import { useAuth } from '../auth/EntraAuthProvider'
-import { Navigate } from 'react-router-dom'
+import { Navigate, Link } from 'react-router-dom'
 
 const LoginPage: React.FC = () => {
   const { isAuthenticated, isLoading, login } = useAuth()
@@ -55,12 +55,17 @@ const LoginPage: React.FC = () => {
           Use your work, school, or personal Microsoft account.
         </p>
 
-        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 space-y-3">
           <p className="text-center text-xs text-gray-400 dark:text-gray-500 flex items-center justify-center gap-1.5">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
             Secured by Microsoft Entra ID
+          </p>
+          <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+            <Link to="/privacy" className="hover:underline">Privacy Policy</Link>
+            <span className="mx-2">·</span>
+            <Link to="/terms" className="hover:underline">Terms of Service</Link>
           </p>
         </div>
       </div>

@@ -14,6 +14,8 @@ import SystemIntegrationPage from './modules/system-integration/pages/SystemInte
 import AIDevelopmentPage from './modules/ai-development/pages/AIDevelopmentPage'
 import ProtectedRoute from './auth/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
+import PrivacyPolicy from './pages/legal/PrivacyPolicy'
+import TermsOfService from './pages/legal/TermsOfService'
 import AuthCallback from './auth/AuthCallback'
 import OnboardingModal from './components/OnboardingModal'
 import { useUser } from './hooks/useUser'
@@ -77,6 +79,8 @@ function App() {
           <Router basename={basename !== '/' ? basename : undefined}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfService />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
 
               <Route element={<ProtectedAppShell />}>
